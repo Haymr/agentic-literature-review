@@ -1,0 +1,827 @@
+{
+  "updatedAt": "2026-03-14T20:33:21.356Z",
+  "createdAt": "2026-03-12T14:28:13.538Z",
+  "id": "E6qqZ2YuDpp5fRXF",
+  "name": "04 - Review Writer Agent",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-wrt",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/temp_extracted.json"
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "id": "read-ext-wrt",
+      "name": "Read Extracted"
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
+      },
+      "id": "parse-ext-wrt",
+      "name": "Parse Extracted",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/temp_analysis.json"
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        500
+      ],
+      "id": "read-ana-wrt",
+      "name": "Read Analysis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
+      },
+      "id": "parse-ana-wrt",
+      "name": "Parse Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge",
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        600,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item1 = $input.all()[0];\nconst item2 = $input.all()[1];\n\nlet extracted = item1 ? (item1.json.extracted_papers || item1.json) : [];\nlet analysis = item2 ? (item2.json.analysis || item2.json) : {};\n\nreturn [{\n  json: {\n    paper_count: analysis.analysis_metadata?.total_papers || Object.keys(extracted).length,\n    year_range: analysis.analysis_metadata?.year_range || \"Unknown\",\n    paper_reference_table: JSON.stringify(extracted),\n    themes_summary: JSON.stringify(analysis.themes || []),\n    methodology_matrix: JSON.stringify(analysis.methodology_comparison || {}),\n    research_gaps: JSON.stringify(analysis.research_gaps || []),\n    cross_cutting_findings: JSON.stringify(analysis.cross_cutting_findings || []),\n    full_paper_data: JSON.stringify(extracted)\n  }\n}];"
+      },
+      "id": "prep-wrt",
+      "name": "Prep Writer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a complete IEEE-format literature review based on the following data from {{ $json.paper_count }} academic papers spanning {{ $json.year_range }}.\n\n=== PAPER REFERENCE LIST ===\n{{ $json.paper_reference_table }}\n\n=== IDENTIFIED THEMES ===\n{{ $json.themes_summary }}\n\n=== METHODOLOGY COMPARISON ===\n{{ $json.methodology_matrix }}\n\n=== RESEARCH GAPS ===\n{{ $json.research_gaps }}\n\n=== CROSS-CUTTING FINDINGS ===\n{{ $json.cross_cutting_findings }}\n\n=== FULL PAPER DATA (for detailed citations) ===\n{{ $json.full_paper_data }}\n\nWrite the COMPLETE literature review now. Include ALL IEEE sections. Every claim must have [P<id>] citations.",
+        "options": {
+          "systemMessage": "You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\n\n## STRICT RULES\n1. WRITE ONLY from provided data. NO external knowledge.\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation. NEVER write 'studies show' without specific reference.\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\n4. Academic, formal tone. Third person. No first person.\n5. Target 3000-6000 words. Scale with paper count.\n\n## FORBIDDEN PHRASES (without immediate [P<id>] citation):\n- 'Studies have shown...'\n- 'Research indicates...'\n- 'It is widely known...'\n- 'The literature suggests...'\n- 'Many researchers agree...'\n- 'It has been demonstrated...'\n\n## SECTION REQUIREMENTS:\n- ABSTRACT: 150-250 words, no citations\n- INTRODUCTION: Background from papers only, scope, research questions\n- METHODOLOGY: Paper count, scope, summary table (Ref|Authors|Year|Title|Method|Contribution)\n- THEMATIC ANALYSIS: One subsection per theme, all claims cited\n- COMPARATIVE ANALYSIS: Methodology comparison table, trends\n- DISCUSSION: Cross-cutting findings, gaps, evolution, study limitations\n- CONCLUSION: Summary, gaps, future directions from papers only\n- REFERENCES: IEEE numbered format [1] A. Author, \"Title,\" Venue, Year.\n\nMap P1\u2192[1], P2\u2192[2], etc. in references.\n\nNEVER add information not in the provided data. If you cannot cite it, do not write it."
+        }
+      },
+      "id": "568e4cf6-33f7-4134-935a-586360a1a399",
+      "name": "Writer LLM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.1
+        },
+        "modelName": "models/gemini-3.1-flash-lite-preview"
+      },
+      "id": "a2876c06-180d-4438-9358-c405a1cf1dc6",
+      "name": "Gemini Flash - Writer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        600
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IZebZJCgpMR7l73Z",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let draft = $input.first().json.text || $input.first().json.output || $input.first().json;\n\nfunction parseTables(text) {\n    const tableRegex = /(?:^|\\n)(\\|[^\\n]+\\|(?:\\n\\|[^\\n]+\\|)+)/g;\n    return text.replace(tableRegex, (match, tableBlock) => {\n        let rows = tableBlock.trim().split('\\n');\n        let html = '<table style=\"border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 14px; text-align: left;\">\\n';\n        for (let i = 0; i < rows.length; i++) {\n            let row = rows[i].trim();\n            // check if it's the separator row e.g. |---|---|\n            if (row.replace(/[\\s|:\\-]/g, '').length === 0) continue; \n            \n            let cells = row.split('|');\n            cells.shift(); // remove empty before first |\n            cells.pop();   // remove empty after last |\n            \n            html += '  <tr>\\n';\n            for (let cell of cells) {\n                let tag = i === 0 ? 'th' : 'td';\n                let style = i === 0 \n                  ? ' style=\"background-color: #f4f4f4; padding: 12px; border: 1px solid #ddd; border-bottom: 2px solid #bbb;\"' \n                  : ' style=\"padding: 12px; border: 1px solid #ddd;\"';\n                html += `    <${tag}${style}>${cell.trim()}</${tag}>\\n`;\n            }\n            html += '  </tr>\\n';\n        }\n        html += '</table>\\n';\n        return '\\n\\n' + html + '\\n\\n';\n    });\n}\n\ndraft = parseTables(draft);\n\nreturn [{\n  json: { text: draft },\n  binary: {\n    data: {\n      data: Buffer.from(draft).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'temp_draft.txt'\n    }\n  }\n}];"
+      },
+      "id": "prep-bin-wrt",
+      "name": "Prep Binary Wrt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/.n8n-files/temp_draft.txt",
+        "dataPropertyName": "data"
+      },
+      "id": "write-txt-wrt",
+      "name": "Write temp_draft.txt",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { result: 'Review written successfully. Draft and HTML saved!' } }];"
+      },
+      "id": "return-str-wrt",
+      "name": "Return String Wrt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-rate-limit-start-123",
+      "name": "Wait (Rate Limit Start)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        150,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.text }}",
+        "destinationKey": "html_output"
+      },
+      "id": "md-node-1",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const htmlRaw = $input.first().json.html_output;\nconst htmlStyled = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>Literature Review</title>\n<link rel=\"stylesheet\" href=\"https://latex.now.sh/style.css\">\n<style>\n  body {\n    max-width: 900px; /* IEEE wide format approx */\n    margin: 40px auto; \n    padding: 0 20px;\n    background-color: #fff;\n  }\n  h1, h2, h3 { text-align: center; }\n  p { text-align: justify; }\n</style>\n</head>\n<body>\n${htmlRaw}\n</body>\n</html>`;\n\nreturn [{\n  json: { success: true },\n  binary: {\n    html_data: {\n      data: Buffer.from(htmlStyled).toString('base64'),\n      mimeType: 'text/html',\n      fileName: 'literature_review.html'\n    }\n  }\n}];"
+      },
+      "id": "css-node-1",
+      "name": "Apply Academic CSS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/.n8n-files/literature_review.html",
+        "dataPropertyName": "html_data"
+      },
+      "id": "write-html-1",
+      "name": "Write literature_review.html",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.text }}"
+      },
+      "id": "md-node-1",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const htmlRaw = $input.first().json.data || $input.first().json;\nconst htmlStyled = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>Literature Review</title>\n<style>\n  body {\n    max-width: 900px;\n    margin: 40px auto; \n    padding: 0 20px;\n    background-color: #fff;\n    font-family: \"Times New Roman\", Times, serif;\n    line-height: 1.6;\n  }\n  h1, h2, h3 { text-align: center; font-family: Arial, Helvetica, sans-serif; }\n  p { text-align: justify; }\n</style>\n</head>\n<body>\n${htmlRaw}\n</body>\n</html>`;\n\nreturn [{\n  json: { success: true },\n  binary: {\n    html_data: {\n      data: Buffer.from(htmlStyled).toString('base64'),\n      mimeType: 'text/html',\n      fileName: 'literature_review.html'\n    }\n  }\n}];"
+      },
+      "id": "css-node-1",
+      "name": "Apply Academic CSS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/.n8n-files/literature_review.html",
+        "dataPropertyName": "html_data"
+      },
+      "id": "write-html-1",
+      "name": "Write literature_review.html",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Wait (Rate Limit Start)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Extracted": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Extracted": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Analysis": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Prep Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Writer": {
+      "main": [
+        [
+          {
+            "node": "Writer LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Writer LLM": {
+      "main": [
+        [
+          {
+            "node": "Prep Binary Wrt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash - Writer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Writer LLM",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Binary Wrt": {
+      "main": [
+        [
+          {
+            "node": "Write temp_draft.txt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write temp_draft.txt": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Rate Limit Start)": {
+      "main": [
+        [
+          {
+            "node": "Read Extracted",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Apply Academic CSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Academic CSS": {
+      "main": [
+        [
+          {
+            "node": "Write literature_review.html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write literature_review.html": {
+      "main": [
+        [
+          {
+            "node": "Return String Wrt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "4d4e31cd-4941-4642-b19c-f5fbd1c493b3",
+  "activeVersionId": "4d4e31cd-4941-4642-b19c-f5fbd1c493b3",
+  "versionCounter": 20,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-12T14:28:13.556Z",
+      "createdAt": "2026-03-12T14:28:13.556Z",
+      "role": "workflow:owner",
+      "workflowId": "E6qqZ2YuDpp5fRXF",
+      "projectId": "roA3b85alNOe0Ceu",
+      "project": {
+        "updatedAt": "2026-03-12T11:12:12.445Z",
+        "createdAt": "2026-03-12T11:05:51.767Z",
+        "id": "roA3b85alNOe0Ceu",
+        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-03-12T11:22:37.385Z",
+      "createdAt": "2026-03-12T11:22:37.385Z",
+      "id": "3KXXOk0suv7qNTUO",
+      "name": "writer"
+    },
+    {
+      "updatedAt": "2026-03-12T11:17:42.147Z",
+      "createdAt": "2026-03-12T11:17:42.147Z",
+      "id": "WbbFTmyU3z3eHNqr",
+      "name": "literature-review"
+    },
+    {
+      "updatedAt": "2026-03-12T11:21:37.743Z",
+      "createdAt": "2026-03-12T11:21:37.743Z",
+      "id": "mrxF1lzrZrgz1ZT3",
+      "name": "sub-workflow"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-14T20:33:21.359Z",
+    "createdAt": "2026-03-14T20:33:21.359Z",
+    "versionId": "4d4e31cd-4941-4642-b19c-f5fbd1c493b3",
+    "workflowId": "E6qqZ2YuDpp5fRXF",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "trigger-wrt",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "fileSelector": "/home/node/.n8n-files/temp_extracted.json"
+        },
+        "type": "n8n-nodes-base.readWriteFile",
+        "typeVersion": 1.1,
+        "position": [
+          200,
+          300
+        ],
+        "id": "read-ext-wrt",
+        "name": "Read Extracted"
+      },
+      {
+        "parameters": {
+          "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
+        },
+        "id": "parse-ext-wrt",
+        "name": "Parse Extracted",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "fileSelector": "/home/node/.n8n-files/temp_analysis.json"
+        },
+        "type": "n8n-nodes-base.readWriteFile",
+        "typeVersion": 1.1,
+        "position": [
+          200,
+          500
+        ],
+        "id": "read-ana-wrt",
+        "name": "Read Analysis"
+      },
+      {
+        "parameters": {
+          "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
+        },
+        "id": "parse-ana-wrt",
+        "name": "Parse Analysis",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          500
+        ]
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "position",
+          "options": {}
+        },
+        "id": "merge",
+        "name": "Merge Data",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2.1,
+        "position": [
+          600,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const item1 = $input.first(0);\nconst item2 = $input.first(1);\n\nlet extracted = item1 ? (item1.json.extracted_papers || item1.json) : [];\nlet analysis = item2 ? (item2.json.analysis || item2.json) : {};\n\nreturn [{\n  json: {\n    paper_count: analysis.analysis_metadata?.total_papers || Object.keys(extracted).length,\n    year_range: analysis.analysis_metadata?.year_range || \"Unknown\",\n    paper_reference_table: JSON.stringify(extracted),\n    themes_summary: JSON.stringify(analysis.themes || []),\n    methodology_matrix: JSON.stringify(analysis.methodology_comparison || {}),\n    research_gaps: JSON.stringify(analysis.research_gaps || []),\n    cross_cutting_findings: JSON.stringify(analysis.cross_cutting_findings || []),\n    full_paper_data: JSON.stringify(extracted)\n  }\n}];"
+        },
+        "id": "prep-wrt",
+        "name": "Prep Writer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          800,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "Write a complete IEEE-format literature review based on the following data from {{ $json.paper_count }} academic papers spanning {{ $json.year_range }}.\n\n=== PAPER REFERENCE LIST ===\n{{ $json.paper_reference_table }}\n\n=== IDENTIFIED THEMES ===\n{{ $json.themes_summary }}\n\n=== METHODOLOGY COMPARISON ===\n{{ $json.methodology_matrix }}\n\n=== RESEARCH GAPS ===\n{{ $json.research_gaps }}\n\n=== CROSS-CUTTING FINDINGS ===\n{{ $json.cross_cutting_findings }}\n\n=== FULL PAPER DATA (for detailed citations) ===\n{{ $json.full_paper_data }}\n\nWrite the COMPLETE literature review now. Include ALL IEEE sections. Every claim must have [P<id>] citations.",
+          "options": {
+            "systemMessage": "You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\n\n## STRICT RULES\n1. WRITE ONLY from provided data. NO external knowledge.\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation. NEVER write 'studies show' without specific reference.\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\n4. Academic, formal tone. Third person. No first person.\n5. Target 3000-6000 words. Scale with paper count.\n\n## FORBIDDEN PHRASES (without immediate [P<id>] citation):\n- 'Studies have shown...'\n- 'Research indicates...'\n- 'It is widely known...'\n- 'The literature suggests...'\n- 'Many researchers agree...'\n- 'It has been demonstrated...'\n\n## SECTION REQUIREMENTS:\n- ABSTRACT: 150-250 words, no citations\n- INTRODUCTION: Background from papers only, scope, research questions\n- METHODOLOGY: Paper count, scope, summary table (Ref|Authors|Year|Title|Method|Contribution)\n- THEMATIC ANALYSIS: One subsection per theme, all claims cited\n- COMPARATIVE ANALYSIS: Methodology comparison table, trends\n- DISCUSSION: Cross-cutting findings, gaps, evolution, study limitations\n- CONCLUSION: Summary, gaps, future directions from papers only\n- REFERENCES: IEEE numbered format [1] A. Author, \"Title,\" Venue, Year.\n\nMap P1\u2192[1], P2\u2192[2], etc. in references.\n\nNEVER add information not in the provided data. If you cannot cite it, do not write it."
+          }
+        },
+        "id": "568e4cf6-33f7-4134-935a-586360a1a399",
+        "name": "Writer LLM",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          1000,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "options": {
+            "maxOutputTokens": 16384,
+            "temperature": 0.1
+          }
+        },
+        "id": "a2876c06-180d-4438-9358-c405a1cf1dc6",
+        "name": "Gemini Flash - Writer",
+        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+        "typeVersion": 1,
+        "position": [
+          1000,
+          600
+        ],
+        "credentials": {
+          "googlePalmApi": {
+            "id": "IZebZJCgpMR7l73Z",
+            "name": "Google Gemini(PaLM) Api account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const draft = $input.first().json.text || $input.first().json.output || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    data: {\n      data: Buffer.from(draft).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'temp_draft.txt'\n    }\n  }\n}];"
+        },
+        "id": "prep-bin-wrt",
+        "name": "Prep Binary Wrt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1200,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "fileName": "/home/node/.n8n-files/temp_draft.txt",
+          "dataPropertyName": "data"
+        },
+        "id": "write-txt-wrt",
+        "name": "Write temp_draft.txt",
+        "type": "n8n-nodes-base.writeBinaryFile",
+        "typeVersion": 1,
+        "position": [
+          1400,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { result: 'Review written successfully. Draft saved to temp_draft.txt.' } }];"
+        },
+        "id": "return-str-wrt",
+        "name": "Return String Wrt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1600,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [
+          [
+            {
+              "node": "Read Extracted",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Read Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Extracted": {
+        "main": [
+          [
+            {
+              "node": "Parse Extracted",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Analysis": {
+        "main": [
+          [
+            {
+              "node": "Parse Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Extracted": {
+        "main": [
+          [
+            {
+              "node": "Merge Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Analysis": {
+        "main": [
+          [
+            {
+              "node": "Merge Data",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Merge Data": {
+        "main": [
+          [
+            {
+              "node": "Prep Writer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prep Writer": {
+        "main": [
+          [
+            {
+              "node": "Writer LLM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Writer LLM": {
+        "main": [
+          [
+            {
+              "node": "Prep Binary Wrt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini Flash - Writer": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Writer LLM",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prep Binary Wrt": {
+        "main": [
+          [
+            {
+              "node": "Write temp_draft.txt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write temp_draft.txt": {
+        "main": [
+          [
+            {
+              "node": "Return String Wrt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Serhan Ege Cayirci",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-14T20:33:21.412Z",
+        "id": 57,
+        "workflowId": "E6qqZ2YuDpp5fRXF",
+        "versionId": "4d4e31cd-4941-4642-b19c-f5fbd1c493b3",
+        "event": "activated",
+        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      },
+      {
+        "createdAt": "2026-03-14T20:33:21.404Z",
+        "id": 56,
+        "workflowId": "E6qqZ2YuDpp5fRXF",
+        "versionId": "4d4e31cd-4941-4642-b19c-f5fbd1c493b3",
+        "event": "deactivated",
+        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      }
+    ]
+  }
+}

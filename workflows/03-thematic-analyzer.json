@@ -1,0 +1,554 @@
+{
+  "updatedAt": "2026-03-14T20:30:57.856Z",
+  "createdAt": "2026-03-12T14:27:54.212Z",
+  "id": "uxOCOraCuF9jvVBq",
+  "name": "03 - Thematic Analyzer Agent",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-ana",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/temp_extracted.json"
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "id": "read-ext",
+      "name": "Read temp_extracted.json"
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\n\nconst papers = data.extracted_papers || data;\nconst text_for_llm = JSON.stringify(papers);\nconst count = Array.isArray(papers) ? papers.length : 1;\n\nreturn [{ \n  json: { \n    papers_for_analysis: text_for_llm, \n    paper_count: count \n  } \n}];"
+      },
+      "id": "prep-ana",
+      "name": "Prep for LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the following {{ $json.paper_count }} academic papers and identify themes, patterns, methodology comparisons, and research gaps.\n\n--- STRUCTURED PAPER DATA ---\n{{ $json.papers_for_analysis }}\n--- END DATA ---\n\nReturn ONLY the JSON analysis object. No markdown, no explanation.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Thematic Analyzer Agent. Your SOLE job is to receive structured data from multiple academic papers and identify themes, patterns, comparisons, and research gaps.\n\n## STRICT RULES\n1. ANALYZE ONLY \u2014 compare, contrast, group, identify patterns. Do NOT write prose or extract raw text.\n2. SOURCE DATA ONLY \u2014 work exclusively with the provided paper JSONs. Every claim must reference paper_ids.\n3. NO EXTERNAL KNOWLEDGE \u2014 if a gap exists in the data, report it. Do not fill it.\n4. EVERY CLAIM NEEDS A REFERENCE \u2014 e.g., \"Papers P1, P3 use deep learning.\"\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"analysis_metadata\": {\n    \"total_papers\": <number>,\n    \"year_range\": \"<start> - <end>\",\n    \"dominant_methodology\": \"<type>\",\n    \"paper_ids_analyzed\": [\"P1\", \"P2\"]\n  },\n  \"themes\": [\n    {\n      \"theme_id\": \"T1\",\n      \"theme_name\": \"<name>\",\n      \"description\": \"<2-3 sentences>\",\n      \"papers\": [\"P1\", \"P3\"],\n      \"key_consensus\": \"<agreement with refs>\",\n      \"key_disagreements\": \"<divergences or NONE>\",\n      \"evidence_strength\": \"STRONG/MODERATE/WEAK\"\n    }\n  ],\n  \"methodology_comparison\": {\n    \"matrix\": [\n      {\n        \"paper_id\": \"P1\",\n        \"methodology_type\": \"<type>\",\n        \"dataset_type\": \"<type>\",\n        \"sample_size\": \"<size>\",\n        \"key_metric\": \"<metric>\",\n        \"key_result\": \"<result>\"\n      }\n    ],\n    \"methodology_trends\": \"<patterns>\",\n    \"methodology_gaps\": \"<missing approaches>\"\n  },\n  \"research_timeline\": [\n    {\n      \"year\": <year>,\n      \"papers\": [\"P1\"],\n      \"contribution\": \"<what was introduced>\"\n    }\n  ],\n  \"research_gaps\": [\n    {\n      \"gap_id\": \"G1\",\n      \"description\": \"<gap description>\",\n      \"supporting_evidence\": \"<which papers suggest this>\",\n      \"papers_referencing\": [\"P1\"]\n    }\n  ],\n  \"cross_cutting_findings\": [\n    {\n      \"finding\": \"<cross-paper finding>\",\n      \"papers\": [\"P1\", \"P2\"],\n      \"consistency\": \"CONSISTENT/PARTIALLY_CONSISTENT/CONTRADICTORY\"\n    }\n  ],\n  \"analysis_confidence\": \"HIGH/MEDIUM/LOW\",\n  \"analysis_notes\": \"<issues>\"\n}\n\nRules: Minimum 2 themes. Every paper must appear in at least one theme. Never add themes from external knowledge."
+        }
+      },
+      "id": "9a1440e6-9292-4944-9d0f-982b200b4df8",
+      "name": "Analyzer LLM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        800,
+        300
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0
+        },
+        "modelName": "models/gemini-3.1-flash-lite-preview"
+      },
+      "id": "61d63889-01a1-4cbf-9d2b-e48d4fe880bb",
+      "name": "Gemini Flash - Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        800,
+        500
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IZebZJCgpMR7l73Z",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "tool-calc",
+      "name": "Calculator",
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const analysis = $input.first().json.text || $input.first().json.output || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    json_data: {\n      data: Buffer.from(JSON.stringify({ analysis: analysis }, null, 2)).toString('base64'),\n      mimeType: 'application/json',\n      fileName: 'temp_analysis.json'\n    }\n  }\n}];"
+      },
+      "id": "prep-bin-ana",
+      "name": "Prep Binary Ana",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "/home/node/.n8n-files/temp_analysis.json",
+        "dataPropertyName": "json_data"
+      },
+      "id": "write-json-ana",
+      "name": "Write temp_analysis.json",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { result: 'Themes analyzed successfully. Data saved to temp_analysis.json.' } }];"
+      },
+      "id": "return-str-ana",
+      "name": "Return String Ana",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-rate-limit-start-123",
+      "name": "Wait (Rate Limit Start)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        150,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Wait (Rate Limit Start)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep for LLM": {
+      "main": [
+        [
+          {
+            "node": "Analyzer LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyzer LLM": {
+      "main": [
+        [
+          {
+            "node": "Prep Binary Ana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash - Analyzer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyzer LLM",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analyzer LLM",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Binary Ana": {
+      "main": [
+        [
+          {
+            "node": "Write temp_analysis.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write temp_analysis.json": {
+      "main": [
+        [
+          {
+            "node": "Return String Ana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read temp_extracted.json": {
+      "main": [
+        [
+          {
+            "node": "Prep for LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Rate Limit Start)": {
+      "main": [
+        [
+          {
+            "node": "Read temp_extracted.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
+  "activeVersionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
+  "versionCounter": 20,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-12T14:27:54.217Z",
+      "createdAt": "2026-03-12T14:27:54.217Z",
+      "role": "workflow:owner",
+      "workflowId": "uxOCOraCuF9jvVBq",
+      "projectId": "roA3b85alNOe0Ceu",
+      "project": {
+        "updatedAt": "2026-03-12T11:12:12.445Z",
+        "createdAt": "2026-03-12T11:05:51.767Z",
+        "id": "roA3b85alNOe0Ceu",
+        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-03-12T11:17:42.147Z",
+      "createdAt": "2026-03-12T11:17:42.147Z",
+      "id": "WbbFTmyU3z3eHNqr",
+      "name": "literature-review"
+    },
+    {
+      "updatedAt": "2026-03-12T11:22:21.601Z",
+      "createdAt": "2026-03-12T11:22:21.601Z",
+      "id": "ZRp9yrut1vTrYIBq",
+      "name": "analyzer"
+    },
+    {
+      "updatedAt": "2026-03-12T11:21:37.743Z",
+      "createdAt": "2026-03-12T11:21:37.743Z",
+      "id": "mrxF1lzrZrgz1ZT3",
+      "name": "sub-workflow"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-14T20:30:57.857Z",
+    "createdAt": "2026-03-14T20:30:57.857Z",
+    "versionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
+    "workflowId": "uxOCOraCuF9jvVBq",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "trigger-ana",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "fileSelector": "/home/node/.n8n-files/temp_extracted.json"
+        },
+        "type": "n8n-nodes-base.readWriteFile",
+        "typeVersion": 1.1,
+        "position": [
+          200,
+          300
+        ],
+        "id": "read-ext",
+        "name": "Read temp_extracted.json"
+      },
+      {
+        "parameters": {
+          "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\n\nconst papers = data.extracted_papers || data;\nconst text_for_llm = JSON.stringify(papers);\nconst count = Array.isArray(papers) ? papers.length : 1;\n\nreturn [{ \n  json: { \n    papers_for_analysis: text_for_llm, \n    paper_count: count \n  } \n}];"
+        },
+        "id": "prep-ana",
+        "name": "Prep for LLM",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          600,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "Analyze the following {{ $json.paper_count }} academic papers and identify themes, patterns, methodology comparisons, and research gaps.\n\n--- STRUCTURED PAPER DATA ---\n{{ $json.papers_for_analysis }}\n--- END DATA ---\n\nReturn ONLY the JSON analysis object. No markdown, no explanation.",
+          "hasOutputParser": true,
+          "options": {
+            "systemMessage": "You are the Thematic Analyzer Agent. Your SOLE job is to receive structured data from multiple academic papers and identify themes, patterns, comparisons, and research gaps.\n\n## STRICT RULES\n1. ANALYZE ONLY \u2014 compare, contrast, group, identify patterns. Do NOT write prose or extract raw text.\n2. SOURCE DATA ONLY \u2014 work exclusively with the provided paper JSONs. Every claim must reference paper_ids.\n3. NO EXTERNAL KNOWLEDGE \u2014 if a gap exists in the data, report it. Do not fill it.\n4. EVERY CLAIM NEEDS A REFERENCE \u2014 e.g., \"Papers P1, P3 use deep learning.\"\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"analysis_metadata\": {\n    \"total_papers\": <number>,\n    \"year_range\": \"<start> - <end>\",\n    \"dominant_methodology\": \"<type>\",\n    \"paper_ids_analyzed\": [\"P1\", \"P2\"]\n  },\n  \"themes\": [\n    {\n      \"theme_id\": \"T1\",\n      \"theme_name\": \"<name>\",\n      \"description\": \"<2-3 sentences>\",\n      \"papers\": [\"P1\", \"P3\"],\n      \"key_consensus\": \"<agreement with refs>\",\n      \"key_disagreements\": \"<divergences or NONE>\",\n      \"evidence_strength\": \"STRONG/MODERATE/WEAK\"\n    }\n  ],\n  \"methodology_comparison\": {\n    \"matrix\": [\n      {\n        \"paper_id\": \"P1\",\n        \"methodology_type\": \"<type>\",\n        \"dataset_type\": \"<type>\",\n        \"sample_size\": \"<size>\",\n        \"key_metric\": \"<metric>\",\n        \"key_result\": \"<result>\"\n      }\n    ],\n    \"methodology_trends\": \"<patterns>\",\n    \"methodology_gaps\": \"<missing approaches>\"\n  },\n  \"research_timeline\": [\n    {\n      \"year\": <year>,\n      \"papers\": [\"P1\"],\n      \"contribution\": \"<what was introduced>\"\n    }\n  ],\n  \"research_gaps\": [\n    {\n      \"gap_id\": \"G1\",\n      \"description\": \"<gap description>\",\n      \"supporting_evidence\": \"<which papers suggest this>\",\n      \"papers_referencing\": [\"P1\"]\n    }\n  ],\n  \"cross_cutting_findings\": [\n    {\n      \"finding\": \"<cross-paper finding>\",\n      \"papers\": [\"P1\", \"P2\"],\n      \"consistency\": \"CONSISTENT/PARTIALLY_CONSISTENT/CONTRADICTORY\"\n    }\n  ],\n  \"analysis_confidence\": \"HIGH/MEDIUM/LOW\",\n  \"analysis_notes\": \"<issues>\"\n}\n\nRules: Minimum 2 themes. Every paper must appear in at least one theme. Never add themes from external knowledge."
+          }
+        },
+        "id": "9a1440e6-9292-4944-9d0f-982b200b4df8",
+        "name": "Analyzer LLM",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          800,
+          300
+        ],
+        "alwaysOutputData": false
+      },
+      {
+        "parameters": {
+          "options": {
+            "maxOutputTokens": 8192,
+            "temperature": 0
+          }
+        },
+        "id": "61d63889-01a1-4cbf-9d2b-e48d4fe880bb",
+        "name": "Gemini Flash - Analyzer",
+        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+        "typeVersion": 1,
+        "position": [
+          800,
+          500
+        ],
+        "credentials": {
+          "googlePalmApi": {
+            "id": "IZebZJCgpMR7l73Z",
+            "name": "Google Gemini(PaLM) Api account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "id": "tool-calc",
+        "name": "Calculator",
+        "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+        "typeVersion": 1,
+        "position": [
+          1000,
+          500
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const analysis = $input.first().json.text || $input.first().json.output || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    json_data: {\n      data: Buffer.from(JSON.stringify({ analysis: analysis }, null, 2)).toString('base64'),\n      mimeType: 'application/json',\n      fileName: 'temp_analysis.json'\n    }\n  }\n}];"
+        },
+        "id": "prep-bin-ana",
+        "name": "Prep Binary Ana",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "fileName": "/home/node/.n8n-files/temp_analysis.json",
+          "dataPropertyName": "json_data"
+        },
+        "id": "write-json-ana",
+        "name": "Write temp_analysis.json",
+        "type": "n8n-nodes-base.writeBinaryFile",
+        "typeVersion": 1,
+        "position": [
+          1200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { result: 'Themes analyzed successfully. Data saved to temp_analysis.json.' } }];"
+        },
+        "id": "return-str-ana",
+        "name": "Return String Ana",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1400,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [
+          [
+            {
+              "node": "Read temp_extracted.json",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prep for LLM": {
+        "main": [
+          [
+            {
+              "node": "Analyzer LLM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Analyzer LLM": {
+        "main": [
+          [
+            {
+              "node": "Prep Binary Ana",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini Flash - Analyzer": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Analyzer LLM",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calculator": {
+        "ai_tool": [
+          [
+            {
+              "node": "Analyzer LLM",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prep Binary Ana": {
+        "main": [
+          [
+            {
+              "node": "Write temp_analysis.json",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write temp_analysis.json": {
+        "main": [
+          [
+            {
+              "node": "Return String Ana",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read temp_extracted.json": {
+        "main": [
+          [
+            {
+              "node": "Prep for LLM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Serhan Ege Cayirci",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-14T20:30:57.887Z",
+        "id": 55,
+        "workflowId": "uxOCOraCuF9jvVBq",
+        "versionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
+        "event": "activated",
+        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      },
+      {
+        "createdAt": "2026-03-14T20:30:57.879Z",
+        "id": 54,
+        "workflowId": "uxOCOraCuF9jvVBq",
+        "versionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
+        "event": "deactivated",
+        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
+      }
+    ]
+  }
+}
