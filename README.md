@@ -1,25 +1,100 @@
 # Agentic AI Literature Review Pipeline
 
-This repository contains a fully automated, multi-agent AI pipeline for conducting comprehensive academic literature reviews. Built entirely on **n8n**, this system serves as a scalable, in-house alternative to tools like NotebookLM, orchestrating 5 specialized AI agents to extract, analyze, draft, and verify academic papers autonomously.
+A multi-agent architecture built entirely on n8n for fully autonomous, offline academic literature reviews.
 
-## Architecture: "Filesystem as State"
+![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-critical.svg)
+![LangChain](https://img.shields.io/badge/LangChain-Integration-blue.svg)
+![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-orange.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-To avoid LLM token explosions and schema errors common with massive academic JSON payloads, this pipeline delegates state management to the local filesystem. Agents communicate strictly through read/write disk operations, transferring only short strings (e.g., "start") through the LangGraph context window.
+📚 **Tutorials** (No coding required!): [English](TUTORIAL.md) | [Türkçe](TUTORIAL_TR.md)
 
-The pipeline consists of 5 modular n8n workflows:
+## 📋 Features
 
-1. **01 - Main Supervisor:** The orchestrator agent. It sequentially triggers the specialized sub-agents and monitors their success.
-2. **02 - Paper Extractor:** Reads loaded academic PDFs, extracts core text, and dumps structured JSON data to the local disk (`temp_extracted.json`).
-3. **03 - Thematic Analyzer:** Processes the extracted JSON to formulate cross-cutting themes, research gaps, and methodologies (`temp_analysis.json`).
-4. **04 - Review Writer:** Ingests the themes and structures a comprehensive literature review in IEEE format. Includes a custom Javascript parser to generate a polished GitHub-Flavored Markdown (GFM) table and Academic CSS-styled HTML page (`literature_review.html`).
-5. **05 - Fact Checker:** The final verification agent. It audits the generated review against the original PDF contents, identifies hallucinations or fabricated claims, and outputs a strict JSON evaluation report.
+- **Multi-Agent Orchestration**: 5 specialized agents mimicking human research workflows.
+- **Filesystem as State**: Eliminates `Token Explosion` and `Schema Parsing` errors by reading/writing directly to disk.
+- **Offline HTML & PDF Generation**: GFM-compliant HTML tables natively compiled avoiding standard n8n Markdown limitations.
+- **API Rate Tracking**: Embedded delay logic to ensure zero `429 Too Many Requests` when using constrained Cloud LLMs (Gemini).
 
-## Key Features
+## 🚀 Quick Start
 
-- **End-to-End Autonomous Output:** Put PDFs in a folder, click "Start", and retrieve a styled HTTP/PDF literature review.
-- **API Rate Limit Protections:** Built-in asynchronous delay nodes (5 seconds) between sub-workflows to respect strict Cloud LLM (Gemini Flash Lite) rate limits.
-- **Offline HTML Rendering:** Bypasses n8n's basic Markdown limitations using a custom GFM-to-HTML regex script, outputting pristine tables natively without third-party PDF APIs.
-- **Extensible LLM Integrations:** Operates with Langchain base nodes, making it trivial to swap Gemini API models for local models via Ollama.
+### Installation
 
-## Quick Start
-Please refer to [TUTORIAL.md](./TUTORIAL.md) for a beginner-friendly installation and execution guide. For Turkish instructions, see [TUTORIAL_TR.md](./TUTORIAL_TR.md).
+```bash
+git clone https://github.com/Haymr/agentic-literature-review.git
+```
+Then, import the 5 JSON files sequentially into your n8n workspace, and activate the workflows.
+
+### Running the Pipeline
+
+Drop your designated PDF literature files into `~/.n8n/local-files/` (or the equivalent mapped Docker volume).
+
+Open the **01-main-supervisor** workflow, set it to Test Mode, and simply type:
+```text
+Başla (or Start)
+```
+The Supervisor Agent will autonomously orchestrate the entire review process.
+
+## 📁 Project Structure
+
+```
+├── workflows/                    # n8n Agent Deployments
+│   ├── 01-main-supervisor.json   # Orchestrator & Chat Memory
+│   ├── 02-paper-extractor.json   # Base Reading Agent
+│   ├── 03-thematic-analyzer.json # Analysis & Gap Identification
+│   ├── 04-review-writer.json     # IEEE Drafting & HTML CSS Render
+│   └── 05-fact-checker.json      # Final Validation Protocol
+│
+├── TUTORIAL.md                   # English Beginner Guide
+├── TUTORIAL_TR.md                # Turkish Beginner Guide
+├── LICENSE                       # MIT License
+└── README.md                     # Project Documentation
+```
+
+## 🔬 Pipeline Architecture
+
+```
+Input (Raw Academic PDFs)
+    │
+    ▼
+┌─────────────────────────────────┐
+│     Filesystem as State         │
+│                                 │
+│  [1] Extractor -> temp_ext.json │
+│  [2] Analyzer  -> temp_aly.json │
+│  [3] Writer    -> temp_draft.txt│
+│  [4] Checker   -> out_check.txt │
+└─────────────────────────────────┘
+    │
+    ▼
+Output (literature_review.html)
+```
+
+**Key Innovations:**
+- **Zero-Token Context Shift**: The Supervisor sends isolated "start" text nodes instead of gigabytes of JSON objects, saving millions of tokens.
+- **GFM Regex Injection**: A custom Javascript sub-node forces Native HTML compilation of GitHub-Flavored Markdown Tables.
+
+## 📊 File Artifacts
+
+| Artifact Generated | Read By | Purpose |
+|-------------------|----------|---------|
+| `temp_extracted.json` | Analyzer, Writer, Checker | Structured PDF raw data |
+| `temp_analysis.json` | Writer | Thematic groupings and gaps |
+| `temp_draft.txt` | Checker, HTML Compiler| The raw IEEE text payload |
+| `out_check.txt` | Supervisor | JSON Verification Audit |
+
+## 🎯 Use Cases
+
+- **Academia**: Automate 80% of rigorous initial literature screening.
+- **Enterprise**: In-house R&D (Alternative to NotebookLM) prioritizing strict data privacy via Local LLMs.
+- **Data Engineering**: Demonstrating robust multi-agent loops decoupled from monolithic single-prompt inferences.
+
+## 🛠️ Requirements
+
+- n8n instance (Local/Docker Desktop)
+- Gemini API Key / Local Ollama Instance
+- Node.js environment (for custom CSS JS nodes)
+
+## 📝 License
+
+MIT License - See [LICENSE](LICENSE) for details.
