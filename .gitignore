@@ -1,0 +1,26 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# n8n Local files (If running locally within the repo)
+.n8n-files/
+temp_*.json
+temp_*.txt
+temp_*.html
+literature_review_output.txt
+literature_review.html
+
+# IDE files
+.vscode/
+.idea/
+*.swp
