@@ -1,23 +1,17 @@
 {
-  "updatedAt": "2026-03-14T20:06:59.551Z",
-  "createdAt": "2026-03-12T14:47:04.515Z",
-  "id": "prsRZpdU848KeQtK",
   "name": "01 - Literature Review Supervisor (Main) - Chat v3",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {
         "options": {}
       },
-      "id": "trigger-chat",
+      "id": "67e4783d-3362-4d29-853b-e0d24cda14f4",
       "name": "Chat Trigger",
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1,
       "position": [
-        -304,
-        304
+        160,
+        -80
       ],
       "webhookId": "a713f3ab-634c-4903-ade5-57f67caeef1c"
     },
@@ -25,13 +19,13 @@
       "parameters": {
         "contextWindowLength": 10
       },
-      "id": "memory-chat",
+      "id": "d815bdc9-8c88-409d-a968-0a7d6bbea882",
       "name": "Window Buffer Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.1,
       "position": [
-        -160,
-        528
+        512,
+        144
       ]
     },
     {
@@ -39,159 +33,152 @@
         "promptType": "define",
         "text": "={{ $json.chatInput }}",
         "options": {
-          "systemMessage": "You are the Supervisor Agent of an AI Literature Review system.\nYou MUST manage a set of tools to create a literature review. The tools communicate via the filesystem, so you NEVER see massive JSON payloads. You only see confirmation messages.\n\nFollow this EXACT sequence when the user asks you to start:\n1. Call `extract_all` (with input: \"start\"). This reads PDFs and saves extraction data to disk.\n2. Wait for it to return success. Then call `analyze_themes` (with input: \"start\"). This reads the extraction data and saves theme data to disk.\n3. Wait for it to return success. Then call `write_review` (with input: \"start\"). This reads the themes and writes a draft to disk.\n4. Wait for it to return success. Then call `check_facts` (with input: \"start\"). This verifies the draft and saves the final output to disk.\n\nCRITICAL RULES:\n- ALWAYS wait for a tool to finish before calling the next one.\n- DO NOT pass complex JSON objects to tools. ONLY pass the exact string \"start\".\n- YOU do not read PDFs or JSON files yourself. The tools do it.",
+          "systemMessage": "You are the Executive Supervisor of an Autonomous Literature Review System.\nYour objective is to direct specialized tools to autonomously complete literature reviews based on user requests.\n\nYou control 4 powerful sub-agents (tools):\n1. extract_all\n2. analyze_themes\n3. write_review\n4. check_facts\n\n## AUTONOMY & ORCHESTRATION RULES (ReAct & Plan-and-Execute):\n1. NO PRE-PROGRAMMED SEQUENCE: You are not bound by a strict sequence. You must deduce the required steps dynamically based on the user's request and tool capabilities.\n2. DEPENDENCY AWARENESS: Logically deduce dependencies. Writing requires analysis to be done first, and analysis requires extraction. Outline your plan mentally before acting.\n3. TARGETED EXECUTION: If the user asks for a specific sub-task (e.g., \"Sadece temaları analiz et\" or \"Check the facts of the existing draft\"), ONLY call the necessary tool(s) for that objective.\n4. SEQUENTIAL EXECUTION: ALWAYS wait for a tool to complete and return a success message before calling the next one.\n5. SELF-CORRECTION: If a tool reports an error (e.g., Fact-Checker hits the retry limit), analyze the issue and decide whether to retry or escalate to the human user.\n6. FILESYSTEM STATE: Tools communicate via the local filesystem. You do not pass massive JSON payloads. Trigger them with simple signals like \"start\".\n7. FILE LOCATION KNOWLEDGE: The academic PDFs are ALREADY mounted and ready in the system's secure local filesystem (/home/node/.n8n-files/). You DO NOT need to ask the user to upload files or provide paths. When the user gives the objective to start, assume the raw data is physically present on disk and immediately initiate your execution plan by extracting them.\n\nDo not ask the user for permission to move to the next logical step. Formulate an execution plan silently and carry it out autonomously. When the goal is complete, provide a final executive summary.",
           "maxIterations": 20
         }
       },
-      "id": "supervisor-agent-v3",
+      "id": "c3c810cc-26ea-4705-bd23-f4f151d39bc6",
       "name": "Supervisor Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        0,
-        304
+        640,
+        -80
       ]
     },
     {
       "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
         "options": {
           "maxOutputTokens": 65536,
           "temperature": 0.1
-        },
-        "modelName": "models/gemini-3.1-flash-lite-preview"
+        }
       },
-      "id": "llm-supervisor",
+      "id": "1baa36a7-954e-4be1-b011-f43a4224223d",
       "name": "Gemini Flash - Supervisor",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        -48,
-        528
+        384,
+        144
       ],
       "credentials": {
         "googlePalmApi": {
-          "id": "PUT_YOUR_CREDENTIAL_ID_HERE",
+          "id": "IZebZJCgpMR7l73Z",
           "name": "Google Gemini(PaLM) Api account"
         }
       }
     },
     {
       "parameters": {
-        "description": "Step 1. Extracts all PDFs. Input MUST be exact string: \"start\"",
-        "name": "extract_all",
-        "source": "database",
-        "toolDescription": "Step 1. Extracts all PDFs. Input MUST be exact string: \"start\"",
+        "description": "Extracts raw text from academic PDFs and converts them into structured JSON methodology and finding representations. Use this when new PDFs need to be ingested or evaluated.",
         "workflowId": {
           "__rl": true,
-          "mode": "list",
-          "value": "auJKkkqtL50nbhB1"
+          "value": "0EMzAgHX6hd54Qk9",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/0EMzAgHX6hd54Qk9"
         },
         "workflowInputs": {
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
+          "value": {},
           "matchingColumns": [],
           "schema": [],
-          "value": {}
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
-      "id": "tool-ext",
+      "id": "c8626f1c-84c6-4ba3-8cd2-edb629c62dea",
       "name": "Tool: Extract All",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        224,
-        528
+        640,
+        144
       ]
     },
     {
       "parameters": {
-        "description": "Step 2. Analyzes themes. Input MUST be exact string: \"start\"",
-        "name": "analyze_themes",
-        "source": "database",
-        "toolDescription": "Step 2. Analyzes themes. Input MUST be exact string: \"start\"",
+        "description": "Analyzes extracted paper JSON data to identify cross-cutting themes, compare methodologies, and discover research gaps. Call this to synthesize raw extracted data.",
         "workflowId": {
           "__rl": true,
-          "mode": "list",
-          "value": "uxOCOraCuF9jvVBq"
+          "value": "MPErNNL0eMwNJLIV",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/MPErNNL0eMwNJLIV"
         },
         "workflowInputs": {
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
+          "value": {},
           "matchingColumns": [],
           "schema": [],
-          "value": {}
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
-      "id": "tool-ana",
+      "id": "394ae1eb-d65e-4056-8e9c-dd0549748e76",
       "name": "Tool: Analyze Themes",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        368,
-        528
+        768,
+        144
       ]
     },
     {
       "parameters": {
-        "description": "Step 3. Writes draft. Input MUST be exact string: \"start\"",
-        "name": "write_review",
-        "source": "database",
-        "toolDescription": "Step 3. Writes draft. Input MUST be exact string: \"start\"",
+        "description": "Writes a complete IEEE-format literature review draft using analyzed themes. Requires extraction and analysis to be completed and available on disk first.",
         "workflowId": {
           "__rl": true,
-          "mode": "list",
-          "value": "E6qqZ2YuDpp5fRXF"
+          "value": "OkJIkPysX3HnxKOZ",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/OkJIkPysX3HnxKOZ"
         },
         "workflowInputs": {
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
+          "value": {},
           "matchingColumns": [],
           "schema": [],
-          "value": {}
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
-      "id": "tool-wrt",
+      "id": "2130e21a-eb0c-47bd-9469-9ecff59a3d5b",
       "name": "Tool: Write Review",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        512,
-        528
+        896,
+        144
       ]
     },
     {
       "parameters": {
-        "description": "Step 4. Checks facts and saves final. Input MUST be exact string: \"start\"",
-        "name": "check_facts",
-        "source": "database",
-        "toolDescription": "Step 4. Checks facts and saves final. Input MUST be exact string: \"start\"",
+        "description": "Verifies the written draft against the original PDF data for hallucinations or fabricated claims. It triggers its own automatic revision loops if errors are found. Always call this as the final validation step after a draft is written.",
         "workflowId": {
           "__rl": true,
-          "mode": "list",
-          "value": "g47DsiVFwUgj9vw9"
+          "value": "JjdIlcVdyoCOnI8i",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/JjdIlcVdyoCOnI8i"
         },
         "workflowInputs": {
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
+          "value": {},
           "matchingColumns": [],
           "schema": [],
-          "value": {}
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
-      "id": "tool-chk",
+      "id": "65d55153-0a0e-4dc8-9899-c6f2050261b5",
       "name": "Tool: Check Facts",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        640,
-        528
+        1024,
+        144
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Chat Trigger": {
       "main": [
@@ -271,329 +258,17 @@
       ]
     }
   },
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
-    "callerPolicy": "workflowsFromSameOwner"
+    "availableInMCP": false
   },
-  "staticData": null,
-  "meta": null,
-  "pinData": {},
-  "versionId": "9866801c-d04c-458a-b86e-d8255d9a0ab2",
-  "activeVersionId": "9866801c-d04c-458a-b86e-d8255d9a0ab2",
-  "versionCounter": 14,
-  "triggerCount": 1,
-  "shared": [
-    {
-      "updatedAt": "2026-03-12T14:47:04.521Z",
-      "createdAt": "2026-03-12T14:47:04.521Z",
-      "role": "workflow:owner",
-      "workflowId": "prsRZpdU848KeQtK",
-      "projectId": "roA3b85alNOe0Ceu",
-      "project": {
-        "updatedAt": "2026-03-12T11:12:12.445Z",
-        "createdAt": "2026-03-12T11:05:51.767Z",
-        "id": "roA3b85alNOe0Ceu",
-        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    }
-  ],
-  "tags": [],
-  "activeVersion": {
-    "updatedAt": "2026-03-14T20:06:59.593Z",
-    "createdAt": "2026-03-14T20:06:59.593Z",
-    "versionId": "9866801c-d04c-458a-b86e-d8255d9a0ab2",
-    "workflowId": "prsRZpdU848KeQtK",
-    "nodes": [
-      {
-        "parameters": {
-          "options": {}
-        },
-        "id": "trigger-chat",
-        "name": "Chat Trigger",
-        "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-        "typeVersion": 1,
-        "position": [
-          -304,
-          304
-        ],
-        "webhookId": "a713f3ab-634c-4903-ade5-57f67caeef1c"
-      },
-      {
-        "parameters": {
-          "contextWindowLength": 10
-        },
-        "id": "memory-chat",
-        "name": "Window Buffer Memory",
-        "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-        "typeVersion": 1.1,
-        "position": [
-          -160,
-          528
-        ]
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "={{ $json.chatInput }}",
-          "options": {
-            "systemMessage": "You are the Supervisor Agent of an AI Literature Review system.\nYou MUST manage a set of tools to create a literature review. The tools communicate via the filesystem, so you NEVER see massive JSON payloads. You only see confirmation messages.\n\nFollow this EXACT sequence when the user asks you to start:\n1. Call `extract_all` (with input: \"start\"). This reads PDFs and saves extraction data to disk.\n2. Wait for it to return success. Then call `analyze_themes` (with input: \"start\"). This reads the extraction data and saves theme data to disk.\n3. Wait for it to return success. Then call `write_review` (with input: \"start\"). This reads the themes and writes a draft to disk.\n4. Wait for it to return success. Then call `check_facts` (with input: \"start\"). This verifies the draft and saves the final output to disk.\n\nCRITICAL RULES:\n- ALWAYS wait for a tool to finish before calling the next one.\n- DO NOT pass complex JSON objects to tools. ONLY pass the exact string \"start\".\n- YOU do not read PDFs or JSON files yourself. The tools do it.",
-            "maxIterations": 20
-          }
-        },
-        "id": "supervisor-agent-v3",
-        "name": "Supervisor Agent",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3.1,
-        "position": [
-          0,
-          304
-        ]
-      },
-      {
-        "parameters": {
-          "options": {
-            "maxOutputTokens": 65536,
-            "temperature": 0.1
-          }
-        },
-        "id": "llm-supervisor",
-        "name": "Gemini Flash - Supervisor",
-        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-        "typeVersion": 1,
-        "position": [
-          -48,
-          528
-        ],
-        "credentials": {
-          "googlePalmApi": {
-            "id": "IZebZJCgpMR7l73Z",
-            "name": "Google Gemini(PaLM) Api account"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "description": "Step 1. Extracts all PDFs. Input MUST be exact string: \"start\"",
-          "name": "extract_all",
-          "source": "database",
-          "toolDescription": "Step 1. Extracts all PDFs. Input MUST be exact string: \"start\"",
-          "workflowId": {
-            "__rl": true,
-            "mode": "list",
-            "value": "auJKkkqtL50nbhB1"
-          },
-          "workflowInputs": {
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false,
-            "mappingMode": "defineBelow",
-            "matchingColumns": [],
-            "schema": [],
-            "value": {}
-          }
-        },
-        "id": "tool-ext",
-        "name": "Tool: Extract All",
-        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-        "typeVersion": 2.2,
-        "position": [
-          224,
-          528
-        ]
-      },
-      {
-        "parameters": {
-          "description": "Step 2. Analyzes themes. Input MUST be exact string: \"start\"",
-          "name": "analyze_themes",
-          "source": "database",
-          "toolDescription": "Step 2. Analyzes themes. Input MUST be exact string: \"start\"",
-          "workflowId": {
-            "__rl": true,
-            "mode": "list",
-            "value": "uxOCOraCuF9jvVBq"
-          },
-          "workflowInputs": {
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false,
-            "mappingMode": "defineBelow",
-            "matchingColumns": [],
-            "schema": [],
-            "value": {}
-          }
-        },
-        "id": "tool-ana",
-        "name": "Tool: Analyze Themes",
-        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-        "typeVersion": 2.2,
-        "position": [
-          368,
-          528
-        ]
-      },
-      {
-        "parameters": {
-          "description": "Step 3. Writes draft. Input MUST be exact string: \"start\"",
-          "name": "write_review",
-          "source": "database",
-          "toolDescription": "Step 3. Writes draft. Input MUST be exact string: \"start\"",
-          "workflowId": {
-            "__rl": true,
-            "mode": "list",
-            "value": "E6qqZ2YuDpp5fRXF"
-          },
-          "workflowInputs": {
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false,
-            "mappingMode": "defineBelow",
-            "matchingColumns": [],
-            "schema": [],
-            "value": {}
-          }
-        },
-        "id": "tool-wrt",
-        "name": "Tool: Write Review",
-        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-        "typeVersion": 2.2,
-        "position": [
-          512,
-          528
-        ]
-      },
-      {
-        "parameters": {
-          "description": "Step 4. Checks facts and saves final. Input MUST be exact string: \"start\"",
-          "name": "check_facts",
-          "source": "database",
-          "toolDescription": "Step 4. Checks facts and saves final. Input MUST be exact string: \"start\"",
-          "workflowId": {
-            "__rl": true,
-            "mode": "list",
-            "value": "g47DsiVFwUgj9vw9"
-          },
-          "workflowInputs": {
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false,
-            "mappingMode": "defineBelow",
-            "matchingColumns": [],
-            "schema": [],
-            "value": {}
-          }
-        },
-        "id": "tool-chk",
-        "name": "Tool: Check Facts",
-        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-        "typeVersion": 2.2,
-        "position": [
-          640,
-          528
-        ]
-      }
-    ],
-    "connections": {
-      "Chat Trigger": {
-        "main": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Window Buffer Memory": {
-        "ai_memory": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_memory",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Gemini Flash - Supervisor": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Tool: Extract All": {
-        "ai_tool": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Tool: Analyze Themes": {
-        "ai_tool": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Tool: Write Review": {
-        "ai_tool": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Tool: Check Facts": {
-        "ai_tool": [
-          [
-            {
-              "node": "Supervisor Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "authors": "Serhan Ege Cayirci",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-03-14T20:06:59.635Z",
-        "id": 31,
-        "workflowId": "prsRZpdU848KeQtK",
-        "versionId": "9866801c-d04c-458a-b86e-d8255d9a0ab2",
-        "event": "activated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      },
-      {
-        "createdAt": "2026-03-14T20:06:59.627Z",
-        "id": 30,
-        "workflowId": "prsRZpdU848KeQtK",
-        "versionId": "9866801c-d04c-458a-b86e-d8255d9a0ab2",
-        "event": "deactivated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    ]
-  }
+  "versionId": "de4b821d-5731-4b84-9d55-fa613313875d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7aec8b029b068956a10542237692cf3bfbb2d308d8dcc3ca3898552060578cc8"
+  },
+  "id": "HiwanUmAs7NHrr79",
+  "tags": []
 }

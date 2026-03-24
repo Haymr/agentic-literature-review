@@ -86,10 +86,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const item1 = $input.all()[0];\nconst item2 = $input.all()[1];\n\nlet extracted = item1 ? (item1.json.extracted_papers || item1.json) : [];\nlet analysis = item2 ? (item2.json.analysis || item2.json) : {};\n\nreturn [{\n  json: {\n    paper_count: analysis.analysis_metadata?.total_papers || Object.keys(extracted).length,\n    year_range: analysis.analysis_metadata?.year_range || \"Unknown\",\n    paper_reference_table: JSON.stringify(extracted),\n    themes_summary: JSON.stringify(analysis.themes || []),\n    methodology_matrix: JSON.stringify(analysis.methodology_comparison || {}),\n    research_gaps: JSON.stringify(analysis.research_gaps || []),\n    cross_cutting_findings: JSON.stringify(analysis.cross_cutting_findings || []),\n    full_paper_data: JSON.stringify(extracted)\n  }\n}];"
+        "jsCode": "const item1 = $input.first(0);\nconst item2 = $input.first(1);\n\n// Deep clone to prevent \"Cannot assign to read-only property\" proxy errors downstream\nconst raw1 = item1 ? JSON.parse(JSON.stringify(item1.json)) : {};\nconst raw2 = item2 ? JSON.parse(JSON.stringify(item2.json)) : {};\n\nlet extracted = raw1.extracted_papers || raw1;\nlet rawAnalysis = raw2.analysis || raw2;\n\n// Handle Double-Stringified JSON gracefully\nlet analysis = rawAnalysis;\nif (typeof rawAnalysis === 'string') {\n  try {\n    analysis = JSON.parse(rawAnalysis);\n  } catch(e) {\n    console.error(\"Failed to parse double-stringified analysis:\", e);\n  }\n}\nif (!analysis || typeof analysis !== 'object') analysis = {};\n\nconst safeArray = (arr) => Array.isArray(arr) ? arr : [];\n\nreturn [{\n  json: {\n    trigger_source: \"INITIAL\",\n    paper_count: analysis.analysis_metadata?.total_papers || Object.keys(extracted).length,\n    year_range: analysis.analysis_metadata?.year_range || \"Unknown\",\n    paper_reference_table: JSON.stringify(extracted),\n    themes_summary: JSON.stringify(safeArray(analysis.themes)),\n    methodology_matrix: JSON.stringify(analysis.methodology_comparison || {}),\n    research_gaps: JSON.stringify(safeArray(analysis.research_gaps)),\n    cross_cutting_findings: JSON.stringify(safeArray(analysis.cross_cutting_findings)),\n    full_paper_data: JSON.stringify(extracted)\n  }\n}];"
       },
       "id": "prep-wrt",
-      "name": "Prep Writer",
+      "name": "Prepare Initial Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -100,18 +100,18 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Write a complete IEEE-format literature review based on the following data from {{ $json.paper_count }} academic papers spanning {{ $json.year_range }}.\n\n=== PAPER REFERENCE LIST ===\n{{ $json.paper_reference_table }}\n\n=== IDENTIFIED THEMES ===\n{{ $json.themes_summary }}\n\n=== METHODOLOGY COMPARISON ===\n{{ $json.methodology_matrix }}\n\n=== RESEARCH GAPS ===\n{{ $json.research_gaps }}\n\n=== CROSS-CUTTING FINDINGS ===\n{{ $json.cross_cutting_findings }}\n\n=== FULL PAPER DATA (for detailed citations) ===\n{{ $json.full_paper_data }}\n\nWrite the COMPLETE literature review now. Include ALL IEEE sections. Every claim must have [P<id>] citations.",
+        "text": "={{ $json.dynamic_user_prompt }}",
         "options": {
-          "systemMessage": "You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\n\n## STRICT RULES\n1. WRITE ONLY from provided data. NO external knowledge.\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation. NEVER write 'studies show' without specific reference.\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\n4. Academic, formal tone. Third person. No first person.\n5. Target 3000-6000 words. Scale with paper count.\n\n## FORBIDDEN PHRASES (without immediate [P<id>] citation):\n- 'Studies have shown...'\n- 'Research indicates...'\n- 'It is widely known...'\n- 'The literature suggests...'\n- 'Many researchers agree...'\n- 'It has been demonstrated...'\n\n## SECTION REQUIREMENTS:\n- ABSTRACT: 150-250 words, no citations\n- INTRODUCTION: Background from papers only, scope, research questions\n- METHODOLOGY: Paper count, scope, summary table (Ref|Authors|Year|Title|Method|Contribution)\n- THEMATIC ANALYSIS: One subsection per theme, all claims cited\n- COMPARATIVE ANALYSIS: Methodology comparison table, trends\n- DISCUSSION: Cross-cutting findings, gaps, evolution, study limitations\n- CONCLUSION: Summary, gaps, future directions from papers only\n- REFERENCES: IEEE numbered format [1] A. Author, \"Title,\" Venue, Year.\n\nMap P1\u2192[1], P2\u2192[2], etc. in references.\n\nNEVER add information not in the provided data. If you cannot cite it, do not write it."
+          "systemMessage": "={{ $json.dynamic_system_prompt }}"
         }
       },
       "id": "568e4cf6-33f7-4134-935a-586360a1a399",
       "name": "Writer LLM",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
       "position": [
         1000,
-        400
+        550
       ]
     },
     {
@@ -273,6 +273,61 @@
         2000,
         400
       ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "review-writer-revision",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-revision",
+      "name": "Webhook (Revision)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/temp_draft.txt"
+      },
+      "id": "read-draft",
+      "name": "Read Existing Draft",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const draftData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst currentDraft = draftData.toString('utf8');\n\nconst webhookItems = $('Webhook (Revision)').all();\nconst webhookBody = webhookItems[0].json.body || webhookItems[0].json;\n\nreturn [{\n  json: {\n    trigger_source: 'REVISION',\n    current_draft: currentDraft,\n    fabricated_claims: typeof webhookBody.fabricated_claims === 'string' ? webhookBody.fabricated_claims : JSON.stringify(webhookBody.fabricated_claims || [], null, 2),\n    feedback_summary: webhookBody.feedback_summary || 'Revision requested.'\n  }\n}];"
+      },
+      "id": "prep-revision-ctx",
+      "name": "Prepare Revision Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst mode = data.trigger_source || 'INITIAL';\n\nlet systemPrompt = '';\nlet userPrompt = '';\n\nif (mode === 'INITIAL') {\n  systemPrompt = `You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\\n\\n## STRICT RULES\\n1. WRITE ONLY from provided data. NO external knowledge.\\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation.\\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\\n4. Academic, formal tone.\\n5. NEVER add information not in the provided data.`;\n  userPrompt = `Write a complete IEEE-format literature review based on the following data from ${data.paper_count} academic papers spanning ${data.year_range}.\\n\\n=== PAPER REFERENCE LIST ===\\n${data.paper_reference_table}\\n\\n=== IDENTIFIED THEMES ===\\n${data.themes_summary}\\n\\n=== METHODOLOGY COMPARISON ===\\n${data.methodology_matrix}\\n\\n=== RESEARCH GAPS ===\\n${data.research_gaps}\\n\\n=== CROSS-CUTTING FINDINGS ===\\n${data.cross_cutting_findings}\\n\\n=== FULL PAPER DATA ===\\n${data.full_paper_data}\\n\\nWrite the COMPLETE literature review now. Every claim must have [P<id>] citations.`;\n} else {\n  systemPrompt = `You are the Review Revision Agent. A Fact-Checker has identified factual errors in your previous draft.\\n\\n## STRICT RULES\\n1. CAREFULLY fix ONLY the fabricated claims mentioned.\\n2. KEEP the rest of the text and structure exactly as it was.\\n3. Remove false claims completely OR adjust them to match facts if provided.\\n4. Maintain IEEE format and all sections.`;\n  userPrompt = `=== FACT-CHECKER FEEDBACK ===\\n${data.feedback_summary}\\n\\n=== FABRICATED CLAIMS TO FIX ===\\n${data.fabricated_claims}\\n\\n=== PREVIOUS DRAFT ===\\n${data.current_draft}\\n\\nBased on the feedback above, REVISE the draft. Return the FULL updated draft but ONLY change the parts related to the fabricated claims. DO NOT output markdown code blocks if possible, just the raw text.`;\n}\n\nreturn [{ json: { ...data, dynamic_system_prompt: systemPrompt, dynamic_user_prompt: userPrompt } }];"
+      },
+      "id": "cognitive-context-switch",
+      "name": "Cognitive Context Switch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        550
+      ]
     }
   ],
   "connections": {
@@ -336,17 +391,6 @@
         [
           {
             "node": "Prep Writer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prep Writer": {
-      "main": [
-        [
-          {
-            "node": "Writer LLM",
             "type": "main",
             "index": 0
           }
@@ -440,6 +484,61 @@
         [
           {
             "node": "Return String Wrt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Initial Context": {
+      "main": [
+        [
+          {
+            "node": "Cognitive Context Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (Revision)": {
+      "main": [
+        [
+          {
+            "node": "Read Existing Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Draft": {
+      "main": [
+        [
+          {
+            "node": "Prepare Revision Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Revision Context": {
+      "main": [
+        [
+          {
+            "node": "Cognitive Context Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cognitive Context Switch": {
+      "main": [
+        [
+          {
+            "node": "Writer LLM",
             "type": "main",
             "index": 0
           }
@@ -598,7 +697,7 @@
           "promptType": "define",
           "text": "Write a complete IEEE-format literature review based on the following data from {{ $json.paper_count }} academic papers spanning {{ $json.year_range }}.\n\n=== PAPER REFERENCE LIST ===\n{{ $json.paper_reference_table }}\n\n=== IDENTIFIED THEMES ===\n{{ $json.themes_summary }}\n\n=== METHODOLOGY COMPARISON ===\n{{ $json.methodology_matrix }}\n\n=== RESEARCH GAPS ===\n{{ $json.research_gaps }}\n\n=== CROSS-CUTTING FINDINGS ===\n{{ $json.cross_cutting_findings }}\n\n=== FULL PAPER DATA (for detailed citations) ===\n{{ $json.full_paper_data }}\n\nWrite the COMPLETE literature review now. Include ALL IEEE sections. Every claim must have [P<id>] citations.",
           "options": {
-            "systemMessage": "You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\n\n## STRICT RULES\n1. WRITE ONLY from provided data. NO external knowledge.\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation. NEVER write 'studies show' without specific reference.\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\n4. Academic, formal tone. Third person. No first person.\n5. Target 3000-6000 words. Scale with paper count.\n\n## FORBIDDEN PHRASES (without immediate [P<id>] citation):\n- 'Studies have shown...'\n- 'Research indicates...'\n- 'It is widely known...'\n- 'The literature suggests...'\n- 'Many researchers agree...'\n- 'It has been demonstrated...'\n\n## SECTION REQUIREMENTS:\n- ABSTRACT: 150-250 words, no citations\n- INTRODUCTION: Background from papers only, scope, research questions\n- METHODOLOGY: Paper count, scope, summary table (Ref|Authors|Year|Title|Method|Contribution)\n- THEMATIC ANALYSIS: One subsection per theme, all claims cited\n- COMPARATIVE ANALYSIS: Methodology comparison table, trends\n- DISCUSSION: Cross-cutting findings, gaps, evolution, study limitations\n- CONCLUSION: Summary, gaps, future directions from papers only\n- REFERENCES: IEEE numbered format [1] A. Author, \"Title,\" Venue, Year.\n\nMap P1\u2192[1], P2\u2192[2], etc. in references.\n\nNEVER add information not in the provided data. If you cannot cite it, do not write it."
+            "systemMessage": "You are the Review Writer Agent. Your SOLE job is to write an IEEE-format academic literature review from the provided data.\n\n## STRICT RULES\n1. WRITE ONLY from provided data. NO external knowledge.\n2. MANDATORY CITATIONS: Every factual claim MUST have [P<id>] inline citation. NEVER write 'studies show' without specific reference.\n3. IEEE FORMAT with these exact sections: I. ABSTRACT, II. INTRODUCTION, III. METHODOLOGY OF REVIEW, IV. THEMATIC ANALYSIS, V. COMPARATIVE ANALYSIS, VI. DISCUSSION, VII. CONCLUSION, VIII. REFERENCES\n4. Academic, formal tone. Third person. No first person.\n5. Target 3000-6000 words. Scale with paper count.\n\n## FORBIDDEN PHRASES (without immediate [P<id>] citation):\n- 'Studies have shown...'\n- 'Research indicates...'\n- 'It is widely known...'\n- 'The literature suggests...'\n- 'Many researchers agree...'\n- 'It has been demonstrated...'\n\n## SECTION REQUIREMENTS:\n- ABSTRACT: 150-250 words, no citations\n- INTRODUCTION: Background from papers only, scope, research questions\n- METHODOLOGY: Paper count, scope, summary table (Ref|Authors|Year|Title|Method|Contribution)\n- THEMATIC ANALYSIS: One subsection per theme, all claims cited\n- COMPARATIVE ANALYSIS: Methodology comparison table, trends\n- DISCUSSION: Cross-cutting findings, gaps, evolution, study limitations\n- CONCLUSION: Summary, gaps, future directions from papers only\n- REFERENCES: IEEE numbered format [1] A. Author, \"Title,\" Venue, Year.\n\nMap P1→[1], P2→[2], etc. in references.\n\nNEVER add information not in the provided data. If you cannot cite it, do not write it."
           }
         },
         "id": "568e4cf6-33f7-4134-935a-586360a1a399",

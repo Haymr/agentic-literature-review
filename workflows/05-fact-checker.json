@@ -1,11 +1,5 @@
 {
-  "updatedAt": "2026-03-14T20:33:21.426Z",
-  "createdAt": "2026-03-12T14:28:31.153Z",
-  "id": "g47DsiVFwUgj9vw9",
   "name": "05 - Fact Checker Agent",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {},
@@ -14,22 +8,36 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        300
+        -300,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-rate-limit",
+      "name": "Wait (Rate Limit Start)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -100,
+        160
       ]
     },
     {
       "parameters": {
         "fileSelector": "/home/node/.n8n-files/*.pdf"
       },
+      "id": "read-pdfs",
+      "name": "Read PDFs",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        200,
-        100
-      ],
-      "id": "read-pdfs",
-      "name": "Read PDFs"
+        100,
+        40
+      ]
     },
     {
       "parameters": {
@@ -40,22 +48,35 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        400,
-        100
+        300,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst combinedText = allItems.map((item, i) => {\n  const text = item.json.text || item.json.data || JSON.stringify(item.json);\n  return `=== PAPER ${i + 1} ===\\n${text}`;\n}).join('\\n\\n');\nreturn [{ json: { combined_pdf_text: combinedText, paper_count: allItems.length } }];"
+      },
+      "id": "combine-pdf-texts",
+      "name": "Combine PDF Texts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        40
       ]
     },
     {
       "parameters": {
         "fileSelector": "/home/node/.n8n-files/temp_draft.txt"
       },
+      "id": "read-draft",
+      "name": "Read Draft",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        200,
-        300
-      ],
-      "id": "read-draft",
-      "name": "Read Draft"
+        100,
+        260
+      ]
     },
     {
       "parameters": {
@@ -66,191 +87,225 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        300
+        300,
+        260
       ]
     },
     {
       "parameters": {
-        "mode": "append",
-        "options": {}
+        "mode": "combine",
+        "combineBy": "position"
       },
-      "id": "merge-chk",
+      "id": "merge-pdfs-draft",
       "name": "Merge PDFs and Draft",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        600,
-        200
+        720,
+        160
       ]
     },
     {
       "parameters": {
-        "jsCode": "const items1 = $input.all(0); // PDFs\nconst item2 = $input.all()[1];  // Draft\n\nconst rawTexts = items1.map(i => i.json.text || '').join('\\n---\\n').substring(0, 30000);\nconst draftStr = item2 ? item2.json.data || item2.json.text || item2.json : '';\n\nreturn [{\n  json: {\n    review_draft: draftStr,\n    verification_context: rawTexts,\n    estimated_claims: 20,\n    paper_count: items1.length\n  }\n}];"
+        "jsCode": "const pdfItem = $input.all()[0];\nconst draftItem = $input.all()[1];\n\nconst combinedPdfText = pdfItem ? pdfItem.json.combined_pdf_text || '' : '';\nconst paperCount = pdfItem ? pdfItem.json.paper_count || 0 : 0;\nconst draftStr = draftItem ? draftItem.json.data || draftItem.json.text || '' : '';\n\nreturn [{\n  json: {\n    review_draft: draftStr,\n    source_papers_text: combinedPdfText,\n    paper_count: paperCount,\n    estimated_claims: 20\n  }\n}];"
       },
-      "id": "prep-chk",
+      "id": "prep-check-ctx",
       "name": "Prepare Check Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        800,
-        200
+        940,
+        160
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Verify ALL factual claims in the following literature review draft against the original paper data.\n\n=== LITERATURE REVIEW DRAFT ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== ORIGINAL PAPER DATA (for verification) ===\n{{ $json.verification_context }}\n=== END PAPER DATA ===\n\nEstimated claims to check: {{ $json.estimated_claims }}\nTotal papers: {{ $json.paper_count }}\n\nVerify each claim and return the JSON verification report.",
+        "text": "=Verify ALL factual claims in the following literature review draft against the SOURCE PAPERS provided below.\n\n=== LITERATURE REVIEW DRAFT (to be verified) ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== SOURCE PAPERS (ground truth) ===\n{{ $json.source_papers_text }}\n=== END SOURCE PAPERS ===\n\nTotal papers available: {{ $json.paper_count }}\nEstimated claims to check: {{ $json.estimated_claims }}\n\nCarefully cross-reference every claim in the draft against the source papers above. Return ONLY a valid JSON verification report with no markdown fences.",
         "options": {
-          "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the original paper data.\n\n## STRICT RULES\n1. VERIFY ONLY \u2014 do not rewrite or add content.\n2. Use THREE sources: draft, structured paper JSONs, and raw paper text excerpts.\n3. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n4. NO EXTERNAL KNOWLEDGE \u2014 verify only against provided data.\n5. Check that each cited paper_id actually supports the claim.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in cited source(s).\n- FABRICATED: Contradicts source data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": <n>,\n    \"verified\": <n>,\n    \"modified\": <n>,\n    \"unverified\": <n>,\n    \"fabricated\": <n>,\n    \"verification_rate\": \"<percent>\",\n    \"pass\": <true/false>\n  },\n  \"claim_verification\": [\n    {\n      \"claim_id\": \"C1\",\n      \"claim_text\": \"<exact claim from draft>\",\n      \"cited_sources\": [\"P1\"],\n      \"verdict\": \"VERIFIED\",\n      \"evidence\": \"<supporting/contradicting evidence from source>\",\n      \"issue\": \"<if not VERIFIED: what is wrong>\",\n      \"suggested_correction\": \"<if MODIFIED: corrected claim>\",\n      \"section_in_review\": \"<section name>\"\n    }\n  ],\n  \"citation_audit\": [\n    {\n      \"paper_id\": \"P1\",\n      \"times_cited_in_draft\": <n>,\n      \"citations_verified\": <n>,\n      \"citations_problematic\": <n>,\n      \"issues\": []\n    }\n  ],\n  \"missing_paper_coverage\": [\n    {\n      \"paper_id\": \"P1\",\n      \"mentioned_in_draft\": true,\n      \"adequately_covered\": true,\n      \"note\": \"\"\n    }\n  ],\n  \"structural_check\": {\n    \"has_abstract\": true,\n    \"has_introduction\": true,\n    \"has_methodology\": true,\n    \"has_thematic_analysis\": true,\n    \"has_comparative_analysis\": true,\n    \"has_discussion\": true,\n    \"has_conclusion\": true,\n    \"has_references\": true,\n    \"all_papers_in_references\": true,\n    \"structural_issues\": []\n  },\n  \"overall_assessment\": \"<2-3 sentence summary>\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20\n\nNEVER mark a claim VERIFIED just because it 'sounds right'. Cross-reference against the actual data.\\n\\nIf a claim requires general real-world verification not present in the text, you MAY use the Wikipedia tool to verify it."
+          "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the SOURCE PAPERS provided directly in the user message.\n\n## CRITICAL INSTRUCTION\nThe original paper texts are included directly in the prompt under '=== SOURCE PAPERS ==='. You MUST use this text as your ground truth for verification. Do NOT use any external knowledge.\n\n## STRICT RULES\n1. VERIFY ONLY - do not rewrite or add content.\n2. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n3. Cross-reference each claim against the source paper text provided. If no matching evidence is found in the source papers, mark as UNVERIFIED. If the source papers contradict the claim, mark as FABRICATED.\n4. NO EXTERNAL KNOWLEDGE - verify only against the source papers provided in the prompt.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in provided source papers.\n- FABRICATED: Contradicts source paper data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": 0,\n    \"verified\": 0,\n    \"modified\": 0,\n    \"unverified\": 0,\n    \"fabricated\": 0,\n    \"verification_rate\": \"0%\",\n    \"pass\": false\n  },\n  \"claim_verification\": [],\n  \"citation_audit\": [],\n  \"missing_paper_coverage\": [],\n  \"structural_check\": {},\n  \"overall_assessment\": \"\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20"
         }
       },
-      "id": "940034e0-47a4-427c-adab-bea5d09aac74",
+      "id": "checker-llm",
       "name": "Checker LLM",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
       "position": [
-        800,
+        1160,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0
+        }
+      },
+      "id": "gemini-flash-checker",
+      "name": "Gemini Flash - Checker",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        380
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IZebZJCgpMR7l73Z",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const outputStr = $input.first().json.text || $input.first().json.output || $input.first().json;\nlet parsed = {};\ntry {\n  const cleanStr = typeof outputStr === 'string' ? outputStr.replace(/[`]{3}json\\n?/g, '').replace(/[`]{3}\\n?/g, '') : JSON.stringify(outputStr);\n  parsed = JSON.parse(cleanStr);\n} catch (e) {\n  parsed = { verification_metadata: { pass: false }, overall_assessment: 'JSON Parse Error from Checker LLM', claim_verification: [] };\n}\nconst runIndex = $runIndex || 0;\nreturn [{\n  json: { ...parsed, retry_count: runIndex, raw_output: outputStr }\n}];"
+      },
+      "id": "parse-route",
+      "name": "Parse & Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "009fb2fc-2646-485c-a117-062e2ff62ddb",
+              "leftValue": "={{ Boolean($json.verification_metadata && $json.verification_metadata.pass) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-pass-fail",
+      "name": "If (Pass/Fail)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "23cbf9ba-648b-4c4c-bdf9-0f04e4c27a20",
+              "leftValue": "={{ $json.retry_count }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-loop-guard",
+      "name": "If (Loop Guard)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
         300
       ]
     },
     {
       "parameters": {
-        "options": {
-          "maxOutputTokens": 8192,
-          "temperature": 0
-        },
-        "modelName": "models/gemini-3.1-flash-lite-preview"
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/review-writer-revision",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"REVISE\",\n  \"fabricated_claims\": {{ JSON.stringify($json.claim_verification ? $json.claim_verification.filter(c => c.verdict === 'FABRICATED' || c.verdict === 'MODIFIED') : []) }},\n  \"feedback_summary\": {{ JSON.stringify($json.overall_assessment || \"Revision needed.\") }}\n}",
+        "options": {}
       },
-      "id": "d80f6e53-9e4d-4ae2-b2ee-02b680b3498d",
-      "name": "Gemini Flash - Checker",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
+      "id": "trigger-writer-revision",
+      "name": "Trigger Writer Revision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
       "position": [
-        800,
-        500
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "PUT_YOUR_CREDENTIAL_ID_HERE",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      }
-    },
-    {
-      "parameters": {},
-      "id": "tool-wiki",
-      "name": "Wikipedia",
-      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
-      "typeVersion": 1,
-      "position": [
-        1000,
-        500
-      ]
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "=Verify ALL factual claims in the following literature review draft against the original paper data.\n\n=== LITERATURE REVIEW DRAFT ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== ORIGINAL PAPER DATA (for verification) ===\n{{ $json.verification_context }}\n=== END PAPER DATA ===\n\nEstimated claims to check: {{ $json.estimated_claims }}\nTotal papers: {{ $json.paper_count }}\n\nVerify each claim and return the JSON verification report.",
-        "options": {
-          "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the original paper data.\n\n## STRICT RULES\n1. VERIFY ONLY \u2014 do not rewrite or add content.\n2. Use THREE sources: draft, structured paper JSONs, and raw paper text excerpts.\n3. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n4. NO EXTERNAL KNOWLEDGE \u2014 verify only against provided data.\n5. Check that each cited paper_id actually supports the claim.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in cited source(s).\n- FABRICATED: Contradicts source data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": <n>,\n    \"verified\": <n>,\n    \"modified\": <n>,\n    \"unverified\": <n>,\n    \"fabricated\": <n>,\n    \"verification_rate\": \"<percent>\",\n    \"pass\": <true/false>\n  },\n  \"claim_verification\": [\n    {\n      \"claim_id\": \"C1\",\n      \"claim_text\": \"<exact claim from draft>\",\n      \"cited_sources\": [\"P1\"],\n      \"verdict\": \"VERIFIED\",\n      \"evidence\": \"<supporting/contradicting evidence from source>\",\n      \"issue\": \"<if not VERIFIED: what is wrong>\",\n      \"suggested_correction\": \"<if MODIFIED: corrected claim>\",\n      \"section_in_review\": \"<section name>\"\n    }\n  ],\n  \"citation_audit\": [\n    {\n      \"paper_id\": \"P1\",\n      \"times_cited_in_draft\": <n>,\n      \"citations_verified\": <n>,\n      \"citations_problematic\": <n>,\n      \"issues\": []\n    }\n  ],\n  \"missing_paper_coverage\": [\n    {\n      \"paper_id\": \"P1\",\n      \"mentioned_in_draft\": true,\n      \"adequately_covered\": true,\n      \"note\": \"\"\n    }\n  ],\n  \"structural_check\": {\n    \"has_abstract\": true,\n    \"has_introduction\": true,\n    \"has_methodology\": true,\n    \"has_thematic_analysis\": true,\n    \"has_comparative_analysis\": true,\n    \"has_discussion\": true,\n    \"has_conclusion\": true,\n    \"has_references\": true,\n    \"all_papers_in_references\": true,\n    \"structural_issues\": []\n  },\n  \"overall_assessment\": \"<2-3 sentence summary>\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20\n\nNEVER mark a claim VERIFIED just because it 'sounds right'. Cross-reference against the actual data.\\n\\nIf a claim requires general real-world verification not present in the text, you MAY use the Wikipedia tool to verify it."
-        }
-      },
-      "id": "940034e0-47a4-427c-adab-bea5d09aac74",
-      "name": "Checker LLM",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1,
-      "position": [
-        1000,
+        2060,
         200
       ]
     },
     {
       "parameters": {
-        "options": {
-          "maxOutputTokens": 8192,
-          "temperature": 0
-        },
-        "modelName": "models/gemini-3.1-flash-lite-preview"
+        "jsCode": "return [{ json: { error: 'CRITICAL ERROR: Infinite Loop Prevented. Fact-checker failed 3 times in a row.' } }];"
       },
-      "id": "d80f6e53-9e4d-4ae2-b2ee-02b680b3498d",
-      "name": "Gemini Flash - Checker",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
+      "id": "guard-error",
+      "name": "Guard Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1000,
-        400
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "PUT_YOUR_CREDENTIAL_ID_HERE",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      }
-    },
-    {
-      "parameters": {},
-      "id": "tool-wiki",
-      "name": "Wikipedia",
-      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
-      "typeVersion": 1,
-      "position": [
-        1150,
-        400
+        2060,
+        420
       ]
     },
     {
       "parameters": {
-        "jsCode": "const verified = $input.first().json.text || $input.first().json.output || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    data: {\n      data: Buffer.from(verified).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'literature_review_output.txt'\n    }\n  }\n}];"
+        "jsCode": "const verified = $input.first().json.raw_output || $input.first().json.text || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    data: {\n      data: Buffer.from(typeof verified === 'string' ? verified : JSON.stringify(verified)).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'literature_review_output.txt'\n    }\n  }\n}];"
       },
-      "id": "prep-bin-chk",
+      "id": "prep-binary-chk",
       "name": "Prep Binary Chk",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
-        200
+        1820,
+        20
       ]
     },
     {
       "parameters": {
         "fileName": "/home/node/.n8n-files/literature_review_output.txt",
-        "dataPropertyName": "data"
+        "dataPropertyName": "data",
+        "options": {}
       },
-      "id": "write-txt-chk",
+      "id": "save-final-output",
       "name": "Save Final Output",
       "type": "n8n-nodes-base.writeBinaryFile",
       "typeVersion": 1,
       "position": [
-        1400,
-        200
+        2060,
+        20
       ]
     },
     {
       "parameters": {
         "jsCode": "return [{ json: { result: 'Review finalized and verified. Final output saved to literature_review_output.txt' } }];"
       },
-      "id": "return-str-chk",
+      "id": "return-string-chk",
       "name": "Return String Chk",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1600,
-        200
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 5,
-        "unit": "seconds"
-      },
-      "id": "wait-rate-limit-start-123",
-      "name": "Wait (Rate Limit Start)",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        150,
-        300
+        2280,
+        20
       ]
     }
   ],
@@ -260,6 +315,22 @@
         [
           {
             "node": "Wait (Rate Limit Start)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Rate Limit Start)": {
+      "main": [
+        [
+          {
+            "node": "Read PDFs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Draft",
             "type": "main",
             "index": 0
           }
@@ -277,22 +348,33 @@
         ]
       ]
     },
-    "Read Draft": {
+    "Extract PDFs": {
       "main": [
         [
           {
-            "node": "Extract Draft",
+            "node": "Combine PDF Texts",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract PDFs": {
+    "Combine PDF Texts": {
       "main": [
         [
           {
             "node": "Merge PDFs and Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Draft": {
+      "main": [
+        [
+          {
+            "node": "Extract Draft",
             "type": "main",
             "index": 0
           }
@@ -336,7 +418,7 @@
       "main": [
         [
           {
-            "node": "Prep Binary Chk",
+            "node": "Parse & Route",
             "type": "main",
             "index": 0
           }
@@ -354,12 +436,48 @@
         ]
       ]
     },
-    "Wikipedia": {
-      "ai_tool": [
+    "Parse & Route": {
+      "main": [
         [
           {
-            "node": "Checker LLM",
-            "type": "ai_tool",
+            "node": "If (Pass/Fail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Pass/Fail)": {
+      "main": [
+        [
+          {
+            "node": "Prep Binary Chk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If (Loop Guard)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Loop Guard)": {
+      "main": [
+        [
+          {
+            "node": "Trigger Writer Revision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guard Error",
+            "type": "main",
             "index": 0
           }
         ]
@@ -386,471 +504,10 @@
           }
         ]
       ]
-    },
-    "Wait (Rate Limit Start)": {
-      "main": [
-        [
-          {
-            "node": "Read PDFs",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read Draft",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
-  "meta": null,
-  "pinData": {},
-  "versionId": "43a4ed60-f706-4ee5-b49d-005a5d57cec9",
-  "activeVersionId": "43a4ed60-f706-4ee5-b49d-005a5d57cec9",
-  "versionCounter": 20,
-  "triggerCount": 0,
-  "shared": [
-    {
-      "updatedAt": "2026-03-12T14:28:31.157Z",
-      "createdAt": "2026-03-12T14:28:31.157Z",
-      "role": "workflow:owner",
-      "workflowId": "g47DsiVFwUgj9vw9",
-      "projectId": "roA3b85alNOe0Ceu",
-      "project": {
-        "updatedAt": "2026-03-12T11:12:12.445Z",
-        "createdAt": "2026-03-12T11:05:51.767Z",
-        "id": "roA3b85alNOe0Ceu",
-        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    }
-  ],
-  "tags": [
-    {
-      "updatedAt": "2026-03-12T11:22:48.197Z",
-      "createdAt": "2026-03-12T11:22:48.197Z",
-      "id": "PuRTHgKUcr6IfOGV",
-      "name": "fact-checker"
-    },
-    {
-      "updatedAt": "2026-03-12T11:17:42.147Z",
-      "createdAt": "2026-03-12T11:17:42.147Z",
-      "id": "WbbFTmyU3z3eHNqr",
-      "name": "literature-review"
-    },
-    {
-      "updatedAt": "2026-03-12T11:21:37.743Z",
-      "createdAt": "2026-03-12T11:21:37.743Z",
-      "id": "mrxF1lzrZrgz1ZT3",
-      "name": "sub-workflow"
-    }
-  ],
-  "activeVersion": {
-    "updatedAt": "2026-03-14T20:33:21.427Z",
-    "createdAt": "2026-03-14T20:33:21.427Z",
-    "versionId": "43a4ed60-f706-4ee5-b49d-005a5d57cec9",
-    "workflowId": "g47DsiVFwUgj9vw9",
-    "nodes": [
-      {
-        "parameters": {},
-        "id": "trigger-chk",
-        "name": "Execute Workflow Trigger",
-        "type": "n8n-nodes-base.executeWorkflowTrigger",
-        "typeVersion": 1,
-        "position": [
-          0,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "fileSelector": "/home/node/.n8n-files/*.pdf"
-        },
-        "type": "n8n-nodes-base.readWriteFile",
-        "typeVersion": 1.1,
-        "position": [
-          200,
-          100
-        ],
-        "id": "read-pdfs",
-        "name": "Read PDFs"
-      },
-      {
-        "parameters": {
-          "operation": "pdf"
-        },
-        "id": "extract-pdf",
-        "name": "Extract PDFs",
-        "type": "n8n-nodes-base.extractFromFile",
-        "typeVersion": 1,
-        "position": [
-          400,
-          100
-        ]
-      },
-      {
-        "parameters": {
-          "fileSelector": "/home/node/.n8n-files/temp_draft.txt"
-        },
-        "type": "n8n-nodes-base.readWriteFile",
-        "typeVersion": 1.1,
-        "position": [
-          200,
-          300
-        ],
-        "id": "read-draft",
-        "name": "Read Draft"
-      },
-      {
-        "parameters": {
-          "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = binaryData.toString('utf8');\nreturn [{ json: { text: text } }];"
-        },
-        "id": "extract-draft",
-        "name": "Extract Draft",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          400,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "mode": "combine",
-          "combineBy": "position",
-          "options": {}
-        },
-        "id": "merge-chk",
-        "name": "Merge PDFs and Draft",
-        "type": "n8n-nodes-base.merge",
-        "typeVersion": 2.1,
-        "position": [
-          600,
-          200
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "const items1 = $input.all(0); // PDFs\nconst item2 = $input.first(1);  // Draft\n\nconst rawTexts = items1.map(i => i.json.text || '').join('\\n---\\n').substring(0, 30000);\nconst draftStr = item2 ? item2.json.data || item2.json.text || item2.json : '';\n\nreturn [{\n  json: {\n    review_draft: draftStr,\n    verification_context: rawTexts,\n    estimated_claims: 20,\n    paper_count: items1.length\n  }\n}];"
-        },
-        "id": "prep-chk",
-        "name": "Prepare Check Context",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          800,
-          200
-        ]
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "Verify ALL factual claims in the following literature review draft against the original paper data.\n\n=== LITERATURE REVIEW DRAFT ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== ORIGINAL PAPER DATA (for verification) ===\n{{ $json.verification_context }}\n=== END PAPER DATA ===\n\nEstimated claims to check: {{ $json.estimated_claims }}\nTotal papers: {{ $json.paper_count }}\n\nVerify each claim and return the JSON verification report.",
-          "options": {
-            "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the original paper data.\n\n## STRICT RULES\n1. VERIFY ONLY \u2014 do not rewrite or add content.\n2. Use THREE sources: draft, structured paper JSONs, and raw paper text excerpts.\n3. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n4. NO EXTERNAL KNOWLEDGE \u2014 verify only against provided data.\n5. Check that each cited paper_id actually supports the claim.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in cited source(s).\n- FABRICATED: Contradicts source data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": <n>,\n    \"verified\": <n>,\n    \"modified\": <n>,\n    \"unverified\": <n>,\n    \"fabricated\": <n>,\n    \"verification_rate\": \"<percent>\",\n    \"pass\": <true/false>\n  },\n  \"claim_verification\": [\n    {\n      \"claim_id\": \"C1\",\n      \"claim_text\": \"<exact claim from draft>\",\n      \"cited_sources\": [\"P1\"],\n      \"verdict\": \"VERIFIED\",\n      \"evidence\": \"<supporting/contradicting evidence from source>\",\n      \"issue\": \"<if not VERIFIED: what is wrong>\",\n      \"suggested_correction\": \"<if MODIFIED: corrected claim>\",\n      \"section_in_review\": \"<section name>\"\n    }\n  ],\n  \"citation_audit\": [\n    {\n      \"paper_id\": \"P1\",\n      \"times_cited_in_draft\": <n>,\n      \"citations_verified\": <n>,\n      \"citations_problematic\": <n>,\n      \"issues\": []\n    }\n  ],\n  \"missing_paper_coverage\": [\n    {\n      \"paper_id\": \"P1\",\n      \"mentioned_in_draft\": true,\n      \"adequately_covered\": true,\n      \"note\": \"\"\n    }\n  ],\n  \"structural_check\": {\n    \"has_abstract\": true,\n    \"has_introduction\": true,\n    \"has_methodology\": true,\n    \"has_thematic_analysis\": true,\n    \"has_comparative_analysis\": true,\n    \"has_discussion\": true,\n    \"has_conclusion\": true,\n    \"has_references\": true,\n    \"all_papers_in_references\": true,\n    \"structural_issues\": []\n  },\n  \"overall_assessment\": \"<2-3 sentence summary>\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20\n\nNEVER mark a claim VERIFIED just because it 'sounds right'. Cross-reference against the actual data.\\n\\nIf a claim requires general real-world verification not present in the text, you MAY use the Wikipedia tool to verify it."
-          }
-        },
-        "id": "940034e0-47a4-427c-adab-bea5d09aac74",
-        "name": "Checker LLM",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3.1,
-        "position": [
-          800,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "options": {
-            "maxOutputTokens": 8192,
-            "temperature": 0
-          }
-        },
-        "id": "d80f6e53-9e4d-4ae2-b2ee-02b680b3498d",
-        "name": "Gemini Flash - Checker",
-        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-        "typeVersion": 1,
-        "position": [
-          800,
-          500
-        ],
-        "credentials": {
-          "googlePalmApi": {
-            "id": "IZebZJCgpMR7l73Z",
-            "name": "Google Gemini(PaLM) Api account"
-          }
-        }
-      },
-      {
-        "parameters": {},
-        "id": "tool-wiki",
-        "name": "Wikipedia",
-        "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
-        "typeVersion": 1,
-        "position": [
-          1000,
-          500
-        ]
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "Verify ALL factual claims in the following literature review draft against the original paper data.\n\n=== LITERATURE REVIEW DRAFT ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== ORIGINAL PAPER DATA (for verification) ===\n{{ $json.verification_context }}\n=== END PAPER DATA ===\n\nEstimated claims to check: {{ $json.estimated_claims }}\nTotal papers: {{ $json.paper_count }}\n\nVerify each claim and return the JSON verification report.",
-          "options": {
-            "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the original paper data.\n\n## STRICT RULES\n1. VERIFY ONLY \u2014 do not rewrite or add content.\n2. Use THREE sources: draft, structured paper JSONs, and raw paper text excerpts.\n3. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n4. NO EXTERNAL KNOWLEDGE \u2014 verify only against provided data.\n5. Check that each cited paper_id actually supports the claim.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in cited source(s).\n- FABRICATED: Contradicts source data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": <n>,\n    \"verified\": <n>,\n    \"modified\": <n>,\n    \"unverified\": <n>,\n    \"fabricated\": <n>,\n    \"verification_rate\": \"<percent>\",\n    \"pass\": <true/false>\n  },\n  \"claim_verification\": [\n    {\n      \"claim_id\": \"C1\",\n      \"claim_text\": \"<exact claim from draft>\",\n      \"cited_sources\": [\"P1\"],\n      \"verdict\": \"VERIFIED\",\n      \"evidence\": \"<supporting/contradicting evidence from source>\",\n      \"issue\": \"<if not VERIFIED: what is wrong>\",\n      \"suggested_correction\": \"<if MODIFIED: corrected claim>\",\n      \"section_in_review\": \"<section name>\"\n    }\n  ],\n  \"citation_audit\": [\n    {\n      \"paper_id\": \"P1\",\n      \"times_cited_in_draft\": <n>,\n      \"citations_verified\": <n>,\n      \"citations_problematic\": <n>,\n      \"issues\": []\n    }\n  ],\n  \"missing_paper_coverage\": [\n    {\n      \"paper_id\": \"P1\",\n      \"mentioned_in_draft\": true,\n      \"adequately_covered\": true,\n      \"note\": \"\"\n    }\n  ],\n  \"structural_check\": {\n    \"has_abstract\": true,\n    \"has_introduction\": true,\n    \"has_methodology\": true,\n    \"has_thematic_analysis\": true,\n    \"has_comparative_analysis\": true,\n    \"has_discussion\": true,\n    \"has_conclusion\": true,\n    \"has_references\": true,\n    \"all_papers_in_references\": true,\n    \"structural_issues\": []\n  },\n  \"overall_assessment\": \"<2-3 sentence summary>\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20\n\nNEVER mark a claim VERIFIED just because it 'sounds right'. Cross-reference against the actual data.\\n\\nIf a claim requires general real-world verification not present in the text, you MAY use the Wikipedia tool to verify it."
-          }
-        },
-        "id": "940034e0-47a4-427c-adab-bea5d09aac74",
-        "name": "Checker LLM",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3.1,
-        "position": [
-          1000,
-          200
-        ]
-      },
-      {
-        "parameters": {
-          "options": {
-            "maxOutputTokens": 8192,
-            "temperature": 0
-          }
-        },
-        "id": "d80f6e53-9e4d-4ae2-b2ee-02b680b3498d",
-        "name": "Gemini Flash - Checker",
-        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-        "typeVersion": 1,
-        "position": [
-          1000,
-          400
-        ],
-        "credentials": {
-          "googlePalmApi": {
-            "id": "IZebZJCgpMR7l73Z",
-            "name": "Google Gemini(PaLM) Api account"
-          }
-        }
-      },
-      {
-        "parameters": {},
-        "id": "tool-wiki",
-        "name": "Wikipedia",
-        "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
-        "typeVersion": 1,
-        "position": [
-          1150,
-          400
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "const verified = $input.first().json.text || $input.first().json.output || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    data: {\n      data: Buffer.from(verified).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'literature_review_output.txt'\n    }\n  }\n}];"
-        },
-        "id": "prep-bin-chk",
-        "name": "Prep Binary Chk",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1200,
-          200
-        ]
-      },
-      {
-        "parameters": {
-          "fileName": "/home/node/.n8n-files/literature_review_output.txt",
-          "dataPropertyName": "data"
-        },
-        "id": "write-txt-chk",
-        "name": "Save Final Output",
-        "type": "n8n-nodes-base.writeBinaryFile",
-        "typeVersion": 1,
-        "position": [
-          1400,
-          200
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "return [{ json: { result: 'Review finalized and verified. Final output saved to literature_review_output.txt' } }];"
-        },
-        "id": "return-str-chk",
-        "name": "Return String Chk",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1600,
-          200
-        ]
-      }
-    ],
-    "connections": {
-      "Execute Workflow Trigger": {
-        "main": [
-          [
-            {
-              "node": "Read PDFs",
-              "type": "main",
-              "index": 0
-            },
-            {
-              "node": "Read Draft",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Read PDFs": {
-        "main": [
-          [
-            {
-              "node": "Extract PDFs",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Read Draft": {
-        "main": [
-          [
-            {
-              "node": "Extract Draft",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Extract PDFs": {
-        "main": [
-          [
-            {
-              "node": "Merge PDFs and Draft",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Extract Draft": {
-        "main": [
-          [
-            {
-              "node": "Merge PDFs and Draft",
-              "type": "main",
-              "index": 1
-            }
-          ]
-        ]
-      },
-      "Merge PDFs and Draft": {
-        "main": [
-          [
-            {
-              "node": "Prepare Check Context",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Prepare Check Context": {
-        "main": [
-          [
-            {
-              "node": "Checker LLM",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Checker LLM": {
-        "main": [
-          [
-            {
-              "node": "Prep Binary Chk",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Gemini Flash - Checker": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "Checker LLM",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Wikipedia": {
-        "ai_tool": [
-          [
-            {
-              "node": "Checker LLM",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Prep Binary Chk": {
-        "main": [
-          [
-            {
-              "node": "Save Final Output",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Save Final Output": {
-        "main": [
-          [
-            {
-              "node": "Return String Chk",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "authors": "Serhan Ege Cayirci",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-03-14T20:33:21.448Z",
-        "id": 59,
-        "workflowId": "g47DsiVFwUgj9vw9",
-        "versionId": "43a4ed60-f706-4ee5-b49d-005a5d57cec9",
-        "event": "activated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      },
-      {
-        "createdAt": "2026-03-14T20:33:21.443Z",
-        "id": 58,
-        "workflowId": "g47DsiVFwUgj9vw9",
-        "versionId": "43a4ed60-f706-4ee5-b49d-005a5d57cec9",
-        "event": "deactivated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    ]
-  }
+  "active": true
 }

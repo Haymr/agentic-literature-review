@@ -62,7 +62,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n// Truncate if too long\nconst truncated = rawText.length > 30000 ? rawText.substring(0, 30000) + '\\n[TRUNCATED]' : rawText;\n\nreturn [{\n  json: { paper_text: truncated, file_name: fileName }\n}];"
+        "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n\n// MİMARİ NOT: Gemini-1.5'in devasa context window'una güvenerek \n// substring(0, 30000) veri kaybı mantığı kaldırıldı.\nreturn [{\n  json: { paper_text: rawText, file_name: fileName }\n}];"
       },
       "id": "prep-ext",
       "name": "Prepare Paper Text",
@@ -457,7 +457,7 @@
       },
       {
         "parameters": {
-          "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n// Truncate if too long\nconst truncated = rawText.length > 30000 ? rawText.substring(0, 30000) + '\\n[TRUNCATED]' : rawText;\n\nreturn [{\n  json: { paper_text: truncated, file_name: fileName }\n}];"
+          "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n\n// MİMARİ NOT: Gemini-1.5'in devasa context window'una güvenerek \n// substring(0, 30000) veri kaybı mantığı kaldırıldı.\nreturn [{\n  json: { paper_text: rawText, file_name: fileName }\n}];"
         },
         "id": "prep-ext",
         "name": "Prepare Paper Text",
