@@ -12,6 +12,7 @@ A multi-agent architecture built entirely on n8n for fully autonomous, offline a
 ## 📋 Features
 
 - **Multi-Agent Orchestration**: 5 specialized agents mimicking human research workflows.
+- **Closed-Loop Self-Correction**: Fact-Checker and Review Writer automatically iterate over factual errors using Webhooks and dynamic context switching.
 - **Filesystem as State**: Eliminates `Token Explosion` and `Schema Parsing` errors by reading/writing directly to disk.
 - **Offline HTML & PDF Generation**: GFM-compliant HTML tables natively compiled avoiding standard n8n Markdown limitations.
 - **API Rate Tracking**: Embedded delay logic to ensure zero `429 Too Many Requests` when using constrained Cloud LLMs (Gemini).
@@ -53,7 +54,7 @@ The Supervisor Agent will autonomously orchestrate the entire review process.
 
 ## 🔬 Pipeline Architecture
 
-```
+```text
 Input (Raw Academic PDFs)
     │
     ▼
@@ -62,7 +63,7 @@ Input (Raw Academic PDFs)
 │                                 │
 │  [1] Extractor -> temp_ext.json │
 │  [2] Analyzer  -> temp_aly.json │
-│  [3] Writer    -> temp_draft.txt│
+│  [3] Writer   <-> temp_draft.txt│ (Iterative Revision via Webhook)
 │  [4] Checker   -> out_check.txt │
 └─────────────────────────────────┘
     │
