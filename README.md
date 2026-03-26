@@ -7,7 +7,22 @@ A multi-agent architecture built entirely on n8n for fully autonomous, offline a
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
+> **Note on Local LLMs:** The repository is configured by default to use **Google Gemini (PaLM) API** (`gemini-3.1-flash-lite-preview`) for out-of-the-box demonstration. To achieve the strict data privacy of Local LLMs (Ollama), simply replace the LangChain Gemini Model nodes with Ollama Chat Model nodes in your n8n workspace.
+
+![Animated Demo Demo](/resources/demo.gif)
+*(Above: The Supervisor Agent orchestrating a 50-paper extraction, analysis, and IEEE formatting sequence in real-time.)*
+
 📚 **Tutorials** (No coding required!): [English](TUTORIAL.md) | [Türkçe](TUTORIAL_TR.md)
+
+## 📈 Business Value & ROI
+
+Transforming days of manual research into mere minutes. This multi-agent pipeline is designed to scale, offering immense efficiency for R&D teams and academic researchers:
+
+* **Massive Time Savings**: A literature review of 50 academic papers that typically requires **2-3 weeks** of human effort can be autonomously orchestrated and drafted in approximately **10-15 minutes** (depending on API response times).
+* **Cost Efficiency (Benchmark)**: The estimated cloud API cost for processing a standard batch of 50 papers is **under $0.50** when using the default lightweight models (Gemini 1.5 Flash).
+* **Fatigue-Free Consistency**: Operates continuously without human fatigue, fully parsing methodologies, extracting cross-cutting findings, and mitigating hallucinations via closed-loop fact-checking.
+
+> *Note on Benchmarks: Time and cost metrics are estimates based on standard 10-15 page academic PDFs and Gemini 1.5 Flash API pricing. Real-world performance may vary depending on document length, active rate limits, and the selected LLM backend.*
 
 ## 📋 Features
 
@@ -54,26 +69,39 @@ The Supervisor Agent will autonomously orchestrate the entire review process.
 
 ## 🔬 Pipeline Architecture
 
-```text
-Input (Raw Academic PDFs)
-    │
-    ▼
-┌─────────────────────────────────┐
-│     Filesystem as State         │
-│                                 │
-│  [1] Extractor -> temp_ext.json │
-│  [2] Analyzer  -> temp_aly.json │
-│  [3] Writer   <-> temp_draft.txt│ (Iterative Revision via Webhook)
-│  [4] Checker   -> out_check.txt │
-└─────────────────────────────────┘
-    │
-    ▼
-Output (literature_review.html)
+```mermaid
+graph TD
+    A[Raw Academic PDFs] -->|Read via n8n| E[02 - Extractor Agent]
+    
+    subgraph Filesystem as State
+        E -->|Writes| F1[(temp_extracted.json)]
+        F1 -->|Reads| AN[03 - Analyzer Agent]
+        AN -->|Writes| F2[(temp_analysis.json)]
+        
+        F1 -->|Reads| W[04 - Writer Agent]
+        F2 -->|Reads| W
+        W -->|Writes & Reads| F3[(temp_draft.txt)]
+        
+        F1 -->|Reads| C[05 - Fact-Checker Agent]
+        F3 -->|Reads| C
+    end
+    
+    C -- "pass: false (Fabricated Claims)" -->|Webhook Trigger| W
+    C -- "pass: true" -->|Verified| OUT[Final HTML & PDF]
+    
+    S((01 - Supervisor)) -.-|Orchestrates| E
+    S -.-|Orchestrates| AN
+    S -.-|Orchestrates| W
+    S -.-|Orchestrates| C
 ```
 
 **Key Innovations:**
 - **Zero-Token Context Shift**: The Supervisor sends isolated "start" text nodes instead of gigabytes of JSON objects, saving millions of tokens.
 - **GFM Regex Injection**: A custom Javascript sub-node forces Native HTML compilation of GitHub-Flavored Markdown Tables.
+- **Closed-Loop Revision**: The Fact-Checker autonomously forces the Writer to revise hallucinated metrics via a dedicated Webhook circuit.
+
+## ⚠️ Known Limitations
+- **Context Window Scaling**: This system operates via full-text Context Injection (sending `temp_extracted.json` directly into the prompt) rather than a Vector Database (RAG). As a result, the maximum volume of papers processed in a single run is limited by the LLM's context window. The system behaves reliably for up to **~50 papers**; beyond this, semantic search (RAG) implementation is required. *(Note: Work in progress 🚧).*
 
 ## 📊 File Artifacts
 
