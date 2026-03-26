@@ -71,28 +71,28 @@ The Supervisor Agent will autonomously orchestrate the entire review process.
 
 ```mermaid
 graph TD
-    A[Raw Academic PDFs] -->|Read via n8n| E[02 - Extractor Agent]
+    A[Raw Academic PDFs] -->|"Read via n8n"| E[02 - Extractor Agent]
     
     subgraph Filesystem as State
-        E -->|Writes| F1[(temp_extracted.json)]
-        F1 -->|Reads| AN[03 - Analyzer Agent]
-        AN -->|Writes| F2[(temp_analysis.json)]
+        E -->|"Writes"| F1[(temp_extracted.json)]
+        F1 -->|"Reads"| AN[03 - Analyzer Agent]
+        AN -->|"Writes"| F2[(temp_analysis.json)]
         
-        F1 -->|Reads| W[04 - Writer Agent]
-        F2 -->|Reads| W
-        W -->|Writes & Reads| F3[(temp_draft.txt)]
+        F1 -->|"Reads"| W[04 - Writer Agent]
+        F2 -->|"Reads"| W
+        W -->|"Writes & Reads"| F3[(temp_draft.txt)]
         
-        F1 -->|Reads| C[05 - Fact-Checker Agent]
-        F3 -->|Reads| C
+        F1 -->|"Reads"| C[05 - Fact-Checker Agent]
+        F3 -->|"Reads"| C
     end
     
-    C -- "pass: false (Fabricated Claims)" -->|Webhook Trigger| W
-    C -- "pass: true" -->|Verified| OUT[Final HTML & PDF]
+    C -->|"Webhook Trigger (pass: false)"| W
+    C -->|"Verified (pass: true)"| OUT[Final HTML & PDF]
     
-    S((01 - Supervisor)) -.-|Orchestrates| E
-    S -.-|Orchestrates| AN
-    S -.-|Orchestrates| W
-    S -.-|Orchestrates| C
+    S((01 - Supervisor)) -.->|"Orchestrates"| E
+    S -.->|"Orchestrates"| AN
+    S -.->|"Orchestrates"| W
+    S -.->|"Orchestrates"| C
 ```
 
 **Key Innovations:**
