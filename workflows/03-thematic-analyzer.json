@@ -263,25 +263,6 @@
   "activeVersionId": "fdb66527-7a48-4ca1-8efc-28ddefba1e46",
   "versionCounter": 20,
   "triggerCount": 0,
-  "shared": [
-    {
-      "updatedAt": "2026-03-12T14:27:54.217Z",
-      "createdAt": "2026-03-12T14:27:54.217Z",
-      "role": "workflow:owner",
-      "workflowId": "uxOCOraCuF9jvVBq",
-      "projectId": "roA3b85alNOe0Ceu",
-      "project": {
-        "updatedAt": "2026-03-12T11:12:12.445Z",
-        "createdAt": "2026-03-12T11:05:51.767Z",
-        "id": "roA3b85alNOe0Ceu",
-        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    }
-  ],
   "tags": [
     {
       "updatedAt": "2026-03-12T11:17:42.147Z",
