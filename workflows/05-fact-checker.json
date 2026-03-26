@@ -239,7 +239,7 @@
         "url": "http://localhost:5678/webhook/review-writer-revision",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"action\": \"REVISE\",\n  \"fabricated_claims\": {{ JSON.stringify($json.claim_verification ? $json.claim_verification.filter(c => c.verdict === 'FABRICATED' || c.verdict === 'MODIFIED') : []) }},\n  \"feedback_summary\": {{ JSON.stringify($json.overall_assessment || \"Revision needed.\") }},\n  \"source_data\": {{ JSON.stringify($('Prepare Check Context').first().json.source_papers_text) }}\n}",
+        "jsonBody": "={\n  \"action\": \"REVISE\",\n  \"fabricated_claims\": {{ JSON.stringify($json.claim_verification ? $json.claim_verification.filter(c => c.verdict === 'FABRICATED' || c.verdict === 'MODIFIED') : []) }},\n  \"feedback_summary\": {{ JSON.stringify($json.overall_assessment || \"Revision needed.\") }}\n}",
         "options": {}
       },
       "id": "9b98ed5b-f597-4787-9921-16e70c633af1",

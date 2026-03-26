@@ -254,15 +254,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const draftData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst currentDraft = draftData.toString('utf8');\n\nconst webhookItems = $('Webhook (Revision)').all();\nconst webhookBody = webhookItems[0].json.body || webhookItems[0].json;\n\nreturn [{\n  json: {\n    trigger_source: 'REVISION',\n    current_draft: currentDraft,\n    fabricated_claims: typeof webhookBody.fabricated_claims === 'string' ? webhookBody.fabricated_claims : JSON.stringify(webhookBody.fabricated_claims || [], null, 2),\n    feedback_summary: webhookBody.feedback_summary || 'Revision requested.',\n    source_data: webhookBody.source_data || 'Source papers not provided.'\n  }\n}];"
+        "jsCode": "const items = $input.all();\nconst rawDraftText = items[0] && items[0].json.data ? items[0].json.data : items[0] && items[0].json.text ? items[0].json.text : '';\nconst rawExtracted = items[1] ? items[1].json : {};\n\nconst extracted = rawExtracted.extracted_papers || rawExtracted;\n\nconst webhookItems = $('Webhook (Revision)').all();\nconst webhookBody = webhookItems[0].json.body || webhookItems[0].json;\n\nreturn [{\n  json: {\n    trigger_source: 'REVISION',\n    current_draft: rawDraftText,\n    fabricated_claims: typeof webhookBody.fabricated_claims === 'string' ? webhookBody.fabricated_claims : JSON.stringify(webhookBody.fabricated_claims || [], null, 2),\n    feedback_summary: webhookBody.feedback_summary || 'Revision requested.',\n    source_data: JSON.stringify(extracted)\n  }\n}];"
       },
       "id": "8efe4932-dc4f-4e14-bb8b-e373be440775",
       "name": "Prepare Revision Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        288,
-        816
+        700,
+        700
       ]
     },
     {
@@ -274,7 +274,58 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        512,
+        900,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/temp_extracted.json",
+        "options": {}
+      },
+      "id": "read-gt-rev-1234",
+      "name": "Read Ground Truth (Revision)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
+      },
+      "id": "parse-gt-rev-4567",
+      "name": "Parse Ground Truth (Revision)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1000
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "merge-rev-data-8901",
+      "name": "Merge Revision Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        500,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = binaryData.toString('utf8');\nreturn [{ json: { dataType: 'draft', text: text } }];"
+      },
+      "id": "extract-draft-rev-9999",
+      "name": "Extract Draft (Revision)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
         624
       ]
     }
@@ -447,6 +498,11 @@
             "node": "Read Existing Draft",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Read Ground Truth (Revision)",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -455,7 +511,7 @@
       "main": [
         [
           {
-            "node": "Prepare Revision Context",
+            "node": "Extract Draft (Revision)",
             "type": "main",
             "index": 0
           }
@@ -489,6 +545,50 @@
         [
           {
             "node": "Prepare Initial Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Ground Truth (Revision)": {
+      "main": [
+        [
+          {
+            "node": "Parse Ground Truth (Revision)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ground Truth (Revision)": {
+      "main": [
+        [
+          {
+            "node": "Merge Revision Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Revision Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Revision Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Draft (Revision)": {
+      "main": [
+        [
+          {
+            "node": "Merge Revision Data",
             "type": "main",
             "index": 0
           }
