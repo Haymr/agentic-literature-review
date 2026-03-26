@@ -26,11 +26,11 @@
     },
     {
       "parameters": {
-        "fileSelector": "/home/node/.n8n-files/*.pdf",
+        "fileSelector": "/home/node/.n8n-files/temp_extracted.json",
         "options": {}
       },
       "id": "38fd4378-2359-4602-9297-29b045f3676e",
-      "name": "Read PDFs",
+      "name": "Read temp_extracted",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
@@ -40,13 +40,12 @@
     },
     {
       "parameters": {
-        "operation": "pdf",
-        "options": {}
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst jsonStr = binaryData.toString('utf8');\nconst data = JSON.parse(jsonStr);\nreturn [{ json: data }];"
       },
       "id": "1fcdf3d0-df7f-4456-95e9-4c1177327586",
-      "name": "Extract PDFs",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
+      "name": "Parse Extracted",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -1456,
         96
@@ -54,10 +53,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst combinedText = allItems.map((item, i) => {\n  const text = item.json.text || item.json.data || JSON.stringify(item.json);\n  return `=== PAPER ${i + 1} ===\\n${text}`;\n}).join('\\n\\n');\nreturn [{ json: { combined_pdf_text: combinedText, paper_count: allItems.length } }];"
+        "jsCode": "const data = $input.first().json;\nconst papers = data.extracted_papers || (Array.isArray(data) ? data : [data]);\n\nconst formattedText = papers.map(p => {\n  const pid = p.paper_id || 'P?';\n  return `=== PAPER: ${pid} ===\\n` + JSON.stringify(p, null, 2);\n}).join('\\n\\n');\n\nreturn [{ json: { combined_pdf_text: formattedText, paper_count: papers.length } }];"
       },
       "id": "4be7dae6-855d-46d0-8878-e1a0ab4fe95f",
-      "name": "Combine PDF Texts",
+      "name": "Format Source Papers",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -323,45 +322,12 @@
       "main": [
         [
           {
-            "node": "Read PDFs",
+            "node": "Read temp_extracted",
             "type": "main",
             "index": 0
           },
           {
             "node": "Read Draft",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read PDFs": {
-      "main": [
-        [
-          {
-            "node": "Extract PDFs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract PDFs": {
-      "main": [
-        [
-          {
-            "node": "Combine PDF Texts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Combine PDF Texts": {
-      "main": [
-        [
-          {
-            "node": "Merge PDFs and Draft",
             "type": "main",
             "index": 0
           }
@@ -497,6 +463,39 @@
         [
           {
             "node": "Return String Chk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read temp_extracted": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Extracted": {
+      "main": [
+        [
+          {
+            "node": "Format Source Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Source Papers": {
+      "main": [
+        [
+          {
+            "node": "Merge PDFs and Draft",
             "type": "main",
             "index": 0
           }
