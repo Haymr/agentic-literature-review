@@ -3,137 +3,134 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "trigger-chk",
+      "id": "5f7f1ed6-b861-4f62-95e0-d7854d35654e",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
       "position": [
-        -300,
-        160
+        -2128,
+        192
       ]
     },
     {
-      "parameters": {
-        "amount": 5,
-        "unit": "seconds"
-      },
-      "id": "wait-rate-limit",
+      "parameters": {},
+      "id": "0d3e0828-4988-431a-a90e-cfc7daa9edd2",
       "name": "Wait (Rate Limit Start)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -100,
-        160
-      ]
+        -1904,
+        192
+      ],
+      "webhookId": "8035c0d9-c7ab-4289-a40a-e37cf97a8515"
     },
     {
       "parameters": {
-        "fileSelector": "/home/node/.n8n-files/*.pdf"
+        "fileSelector": "/home/node/.n8n-files/*.pdf",
+        "options": {}
       },
-      "id": "read-pdfs",
+      "id": "38fd4378-2359-4602-9297-29b045f3676e",
       "name": "Read PDFs",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        100,
-        40
+        -1680,
+        96
       ]
     },
     {
       "parameters": {
-        "operation": "pdf"
+        "operation": "pdf",
+        "options": {}
       },
-      "id": "extract-pdf",
+      "id": "1fcdf3d0-df7f-4456-95e9-4c1177327586",
       "name": "Extract PDFs",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        300,
-        40
+        -1456,
+        96
       ]
     },
     {
       "parameters": {
         "jsCode": "const allItems = $input.all();\nconst combinedText = allItems.map((item, i) => {\n  const text = item.json.text || item.json.data || JSON.stringify(item.json);\n  return `=== PAPER ${i + 1} ===\\n${text}`;\n}).join('\\n\\n');\nreturn [{ json: { combined_pdf_text: combinedText, paper_count: allItems.length } }];"
       },
-      "id": "combine-pdf-texts",
+      "id": "4be7dae6-855d-46d0-8878-e1a0ab4fe95f",
       "name": "Combine PDF Texts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        500,
-        40
+        -1232,
+        96
       ]
     },
     {
       "parameters": {
-        "fileSelector": "/home/node/.n8n-files/temp_draft.txt"
+        "fileSelector": "/home/node/.n8n-files/temp_draft.txt",
+        "options": {}
       },
-      "id": "read-draft",
+      "id": "2b45c408-3780-48bb-8fa3-03a426c90261",
       "name": "Read Draft",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        100,
-        260
+        -1456,
+        288
       ]
     },
     {
       "parameters": {
         "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst text = binaryData.toString('utf8');\nreturn [{ json: { text: text } }];"
       },
-      "id": "extract-draft",
+      "id": "c44247f2-3efd-40ff-bc98-9f26acc0c713",
       "name": "Extract Draft",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        300,
-        260
+        -1232,
+        288
       ]
     },
     {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "position"
-      },
-      "id": "merge-pdfs-draft",
+      "parameters": {},
+      "id": "4a7c958c-67c1-40f8-afca-d00f4fe62596",
       "name": "Merge PDFs and Draft",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        720,
-        160
+        -1008,
+        192
       ]
     },
     {
       "parameters": {
         "jsCode": "const pdfItem = $input.all()[0];\nconst draftItem = $input.all()[1];\n\nconst combinedPdfText = pdfItem ? pdfItem.json.combined_pdf_text || '' : '';\nconst paperCount = pdfItem ? pdfItem.json.paper_count || 0 : 0;\nconst draftStr = draftItem ? draftItem.json.data || draftItem.json.text || '' : '';\n\nreturn [{\n  json: {\n    review_draft: draftStr,\n    source_papers_text: combinedPdfText,\n    paper_count: paperCount,\n    estimated_claims: 20\n  }\n}];"
       },
-      "id": "prep-check-ctx",
+      "id": "576af853-ac38-46bf-955e-7b8fb57f67ba",
       "name": "Prepare Check Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        940,
-        160
+        -784,
+        192
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Verify ALL factual claims in the following literature review draft against the SOURCE PAPERS provided below.\n\n=== LITERATURE REVIEW DRAFT (to be verified) ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== SOURCE PAPERS (ground truth) ===\n{{ $json.source_papers_text }}\n=== END SOURCE PAPERS ===\n\nTotal papers available: {{ $json.paper_count }}\nEstimated claims to check: {{ $json.estimated_claims }}\n\nCarefully cross-reference every claim in the draft against the source papers above. Return ONLY a valid JSON verification report with no markdown fences.",
-        "options": {
-          "systemMessage": "You are the Fact Checker Agent. Your SOLE job is to verify every factual claim in the literature review draft against the SOURCE PAPERS provided directly in the user message.\n\n## CRITICAL INSTRUCTION\nThe original paper texts are included directly in the prompt under '=== SOURCE PAPERS ==='. You MUST use this text as your ground truth for verification. Do NOT use any external knowledge.\n\n## STRICT RULES\n1. VERIFY ONLY - do not rewrite or add content.\n2. Every claim gets a verdict: VERIFIED, MODIFIED, UNVERIFIED, or FABRICATED.\n3. Cross-reference each claim against the source paper text provided. If no matching evidence is found in the source papers, mark as UNVERIFIED. If the source papers contradict the claim, mark as FABRICATED.\n4. NO EXTERNAL KNOWLEDGE - verify only against the source papers provided in the prompt.\n\n## VERDICT DEFINITIONS\n- VERIFIED: Claim matches source data accurately.\n- MODIFIED: Partially correct but misrepresents details.\n- UNVERIFIED: Cannot be found in provided source papers.\n- FABRICATED: Contradicts source paper data or references non-existent paper.\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON (no markdown fences):\n{\n  \"verification_metadata\": {\n    \"total_claims_checked\": 0,\n    \"verified\": 0,\n    \"modified\": 0,\n    \"unverified\": 0,\n    \"fabricated\": 0,\n    \"verification_rate\": \"0%\",\n    \"pass\": false\n  },\n  \"claim_verification\": [],\n  \"citation_audit\": [],\n  \"missing_paper_coverage\": [],\n  \"structural_check\": {},\n  \"overall_assessment\": \"\"\n}\n\nPass criteria: fabricated == 0 AND (unverified / total) < 0.20"
-        }
+        "text": "=Verify ALL factual claims in the following literature review draft against the SOURCE PAPERS provided below.\n\n=== LITERATURE REVIEW DRAFT (to be verified) ===\n{{ $json.review_draft }}\n=== END DRAFT ===\n\n=== SOURCE PAPERS (ground truth) ===\n{{ $json.source_papers_text }}\n=== END SOURCE PAPERS ===\n\nTotal papers available: {{ $json.paper_count }}\nEstimated claims to check: {{ $json.estimated_claims }}\n\nCarefully cross-reference every claim in the draft against the source papers above. Return ONLY a valid JSON verification report with no markdown fences."
       },
-      "id": "checker-llm",
+      "id": "0ba6a63d-a16f-476e-9c97-329b1d5b72f1",
       "name": "Checker LLM",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
       "position": [
-        1160,
-        160
-      ]
+        -560,
+        192
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -143,13 +140,13 @@
           "temperature": 0
         }
       },
-      "id": "gemini-flash-checker",
+      "id": "94263a1a-7705-4b96-a7ee-65ff52a0a40f",
       "name": "Gemini Flash - Checker",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        1160,
-        380
+        -496,
+        416
       ],
       "credentials": {
         "googlePalmApi": {
@@ -162,13 +159,13 @@
       "parameters": {
         "jsCode": "const outputStr = $input.first().json.text || $input.first().json.output || $input.first().json;\nlet parsed = {};\ntry {\n  const cleanStr = typeof outputStr === 'string' ? outputStr.replace(/[`]{3}json\\n?/g, '').replace(/[`]{3}\\n?/g, '') : JSON.stringify(outputStr);\n  parsed = JSON.parse(cleanStr);\n} catch (e) {\n  parsed = { verification_metadata: { pass: false }, overall_assessment: 'JSON Parse Error from Checker LLM', claim_verification: [] };\n}\nconst runIndex = $runIndex || 0;\nreturn [{\n  json: { ...parsed, retry_count: runIndex, raw_output: outputStr }\n}];"
       },
-      "id": "parse-route",
+      "id": "34260a74-62e3-4157-b7b0-29f2fde61e1f",
       "name": "Parse & Route",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
-        160
+        -208,
+        192
       ]
     },
     {
@@ -177,7 +174,8 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 2
           },
           "conditions": [
             {
@@ -195,13 +193,13 @@
         },
         "options": {}
       },
-      "id": "if-pass-fail",
+      "id": "c195f2fd-1715-4e94-8bfd-709e256c4a01",
       "name": "If (Pass/Fail)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1600,
-        160
+        16,
+        192
       ]
     },
     {
@@ -227,13 +225,13 @@
         },
         "options": {}
       },
-      "id": "if-loop-guard",
+      "id": "88b680fc-a324-48b8-aa44-0e410f7e6c5c",
       "name": "If (Loop Guard)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1820,
-        300
+        240,
+        288
       ]
     },
     {
@@ -245,70 +243,70 @@
         "jsonBody": "={\n  \"action\": \"REVISE\",\n  \"fabricated_claims\": {{ JSON.stringify($json.claim_verification ? $json.claim_verification.filter(c => c.verdict === 'FABRICATED' || c.verdict === 'MODIFIED') : []) }},\n  \"feedback_summary\": {{ JSON.stringify($json.overall_assessment || \"Revision needed.\") }}\n}",
         "options": {}
       },
-      "id": "trigger-writer-revision",
+      "id": "9b98ed5b-f597-4787-9921-16e70c633af1",
       "name": "Trigger Writer Revision",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2060,
-        200
+        464,
+        192
       ]
     },
     {
       "parameters": {
         "jsCode": "return [{ json: { error: 'CRITICAL ERROR: Infinite Loop Prevented. Fact-checker failed 3 times in a row.' } }];"
       },
-      "id": "guard-error",
+      "id": "550ac798-f706-4117-90a7-d96873bcfc9e",
       "name": "Guard Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2060,
-        420
+        464,
+        384
       ]
     },
     {
       "parameters": {
         "jsCode": "const verified = $input.first().json.raw_output || $input.first().json.text || $input.first().json;\nreturn [{\n  json: { success: true },\n  binary: {\n    data: {\n      data: Buffer.from(typeof verified === 'string' ? verified : JSON.stringify(verified)).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'literature_review_output.txt'\n    }\n  }\n}];"
       },
-      "id": "prep-binary-chk",
+      "id": "7fd866c1-3cec-4f8f-9864-75a5cdc6dd1b",
       "name": "Prep Binary Chk",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
-        20
+        240,
+        0
       ]
     },
     {
       "parameters": {
         "fileName": "/home/node/.n8n-files/literature_review_output.txt",
-        "dataPropertyName": "data",
         "options": {}
       },
-      "id": "save-final-output",
+      "id": "6aba18d9-08da-4d10-9a48-5ede3610806b",
       "name": "Save Final Output",
       "type": "n8n-nodes-base.writeBinaryFile",
       "typeVersion": 1,
       "position": [
-        2060,
-        20
+        464,
+        0
       ]
     },
     {
       "parameters": {
         "jsCode": "return [{ json: { result: 'Review finalized and verified. Final output saved to literature_review_output.txt' } }];"
       },
-      "id": "return-string-chk",
+      "id": "1484fe99-df66-4464-acaf-553faf0df083",
       "name": "Return String Chk",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2280,
-        20
+        688,
+        0
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Execute Workflow Trigger": {
       "main": [
@@ -506,8 +504,16 @@
       ]
     }
   },
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "active": true
+  "versionId": "2795f2a1-881b-4c1b-a967-8dfa273b720b",
+  "meta": {
+    "instanceId": "7aec8b029b068956a10542237692cf3bfbb2d308d8dcc3ca3898552060578cc8"
+  },
+  "id": "Do9z4hIyALy72OWo",
+  "tags": []
 }

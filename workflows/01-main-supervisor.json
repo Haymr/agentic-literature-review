@@ -101,9 +101,9 @@
         "description": "Analyzes extracted paper JSON data to identify cross-cutting themes, compare methodologies, and discover research gaps. Call this to synthesize raw extracted data.",
         "workflowId": {
           "__rl": true,
-          "value": "MPErNNL0eMwNJLIV",
+          "value": "KlUx3Rv6kqU3yZ9K",
           "mode": "id",
-          "cachedResultUrl": "/workflow/MPErNNL0eMwNJLIV"
+          "cachedResultUrl": "/workflow/KlUx3Rv6kqU3yZ9K"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -128,9 +128,9 @@
         "description": "Writes a complete IEEE-format literature review draft using analyzed themes. Requires extraction and analysis to be completed and available on disk first.",
         "workflowId": {
           "__rl": true,
-          "value": "OkJIkPysX3HnxKOZ",
+          "value": "18AAR2OMbuqdqunV",
           "mode": "id",
-          "cachedResultUrl": "/workflow/OkJIkPysX3HnxKOZ"
+          "cachedResultUrl": "/workflow/18AAR2OMbuqdqunV"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -155,9 +155,9 @@
         "description": "Verifies the written draft against the original PDF data for hallucinations or fabricated claims. It triggers its own automatic revision loops if errors are found. Always call this as the final validation step after a draft is written.",
         "workflowId": {
           "__rl": true,
-          "value": "JjdIlcVdyoCOnI8i",
+          "value": "Do9z4hIyALy72OWo",
           "mode": "id",
-          "cachedResultUrl": "/workflow/JjdIlcVdyoCOnI8i"
+          "cachedResultUrl": "/workflow/Do9z4hIyALy72OWo"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -264,7 +264,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "de4b821d-5731-4b84-9d55-fa613313875d",
+  "versionId": "ce8cdac5-a37e-4d13-aa12-3b3d7f83248f",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7aec8b029b068956a10542237692cf3bfbb2d308d8dcc3ca3898552060578cc8"
