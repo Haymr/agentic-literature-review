@@ -34,6 +34,12 @@ This release introduces a paradigm shift in the pipeline architecture, moving fr
 *   **Extractor Batch Dropping Bug - `02-paper-extractor.json`**:
     *   *Issue:* Extractor dropped PDFs when `batchSize` > 1 due to hardcoded `$input.first()` methods processing only the first item in the batch.
     *   *Fix:* Converted all input parsing nodes to use array mapping (`$input.all().map(...)`), ensuring complete processing of all PDFs in the batch.
+
+### 🏗️ Architectural Refactoring (Phase 2)
+*   **Zero-Token Restoration - `04-review-writer.json` & `05-fact-checker.json`**:
+    *   *Issue:* The Ground Truth injection fix forced the Fact-Checker to send massive PDF textual data over the HTTP webhook, effectively violating the filesystem-as-state zero-token design.
+    *   *Fix:* Stripped the massive payload from the Fact-Checker webhook. Added a local disk-read circuit (`Read/Parse Ground Truth`) directly to the Writer's webhook revision branch, allowing it to autonomously fetch `temp_extracted.json` during error correction without API transmission overhead.
+
 ## [v1.0.0] - Initial Release (main)
 *   Initial 5-agent linear pipeline (Supervisor → Extractor → Analyzer → Writer → Checker).
 *   Complete offline HTML and PDF generation.

@@ -9,7 +9,7 @@ A multi-agent architecture built entirely on n8n for fully autonomous, offline a
 
 > **Note on Local LLMs:** The repository is configured by default to use **Google Gemini (PaLM) API** (`gemini-3.1-flash-lite-preview`) for out-of-the-box demonstration. To achieve the strict data privacy of Local LLMs (Ollama), simply replace the LangChain Gemini Model nodes with Ollama Chat Model nodes in your n8n workspace.
 
-![Animated Demo Demo](/resources/demo.gif)
+![Animated Demo](/resources/demo.gif)
 *(Above: The Supervisor Agent orchestrating a 50-paper extraction, analysis, and IEEE formatting sequence in real-time.)*
 
 📚 **Tutorials** (No coding required!): [English](TUTORIAL.md) | [Türkçe](TUTORIAL_TR.md)
@@ -71,28 +71,28 @@ The Supervisor Agent will autonomously orchestrate the entire review process.
 
 ```mermaid
 graph TD
-    A[Raw Academic PDFs] -->|"Read via n8n"| E[02 - Extractor Agent]
+    A[Raw Academic PDFs] -->|Read via n8n| E[02 - Extractor Agent]
     
     subgraph Filesystem as State
-        E -->|"Writes"| F1[(temp_extracted.json)]
-        F1 -->|"Reads"| AN[03 - Analyzer Agent]
-        AN -->|"Writes"| F2[(temp_analysis.json)]
+        E -->|Writes| F1[(temp_extracted.json)]
+        F1 -->|Reads| AN[03 - Analyzer Agent]
+        AN -->|Writes| F2[(temp_analysis.json)]
         
-        F1 -->|"Reads"| W[04 - Writer Agent]
-        F2 -->|"Reads"| W
-        W -->|"Writes & Reads"| F3[(temp_draft.txt)]
+        F1 -->|Reads| W[04 - Writer Agent]
+        F2 -->|Reads| W
+        W -->|Writes & Reads| F3[(temp_draft.txt)]
         
-        F1 -->|"Reads"| C[05 - Fact-Checker Agent]
-        F3 -->|"Reads"| C
+        F1 -->|Reads| C[05 - Fact-Checker Agent]
+        F3 -->|Reads| C
     end
     
-    C -->|"Webhook Trigger (pass: false)"| W
-    C -->|"Verified (pass: true)"| OUT[Final HTML & PDF]
+    C -- "pass: false (Fabricated Claims)" -->|Webhook Trigger| W
+    C -- "pass: true" -->|Verified| OUT[Final HTML & PDF]
     
-    S((01 - Supervisor)) -.->|"Orchestrates"| E
-    S -.->|"Orchestrates"| AN
-    S -.->|"Orchestrates"| W
-    S -.->|"Orchestrates"| C
+    S((01 - Supervisor)) -.-|Orchestrates| E
+    S -.-|Orchestrates| AN
+    S -.-|Orchestrates| W
+    S -.-|Orchestrates| C
 ```
 
 **Key Innovations:**
