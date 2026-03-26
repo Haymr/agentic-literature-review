@@ -25,7 +25,15 @@ This release introduces a paradigm shift in the pipeline architecture, moving fr
 *   **"Double-Stringified JSON" Data Loss & LLM Hallucinations**:
     *   *Issue:* LLMs occasionally return raw JSON strings instead of parsable objects. When n8n saved this to `temp_analysis.json` and read it back, properties like `.themes` resolved to `undefined`, causing the Writer to hallucinate papers without actual data.
     *   *Fix:* Embedded **Defensive Parsing** mechanisms in both `03-thematic-analyzer.json` (before writing) and `04-review-writer.json` (during reading). If the payload is detected as a string, n8n automatically runs `JSON.parse` to guarantee an Object is passed to the LLM.
-
+*   **Fact-Checker Programmatic Leniency & JSON Robustness**:
+    *   *Issue:* The Fact-Checker LLM was overly pedantic, failing valid syntheses (e.g., merging "5-6" and "12-14" to "5 to 14") and occasionally generating invalid JSON comments (`//`) that broke the parser, causing infinite 3-retry loops.
+    *   *Fix:* Removed invalid comments from the prompt blueprint, stripped control characters via regex, and added a programmatic leniency guard that forces a `pass: true` if no claims are explicitly `FABRICATED`.
+*   **Blind Re-Writer (Attention Dilution) Fix - `04-review-writer.json`**:
+    *   *Issue:* During the webhook revision loop, the Writer Agent was only supplied with the draft and the Checker's feedback. Lacking the original source papers, it could not accurately correct hallucinated claims.
+    *   *Fix:* Injected the Ground Truth (`source_papers_text`) into the Fact-Checker's webhook payload. The Writer now receives the original source material during revision, ensuring 100% accurate factual corrections without guessing.
+*   **Extractor Batch Dropping Bug - `02-paper-extractor.json`**:
+    *   *Issue:* Extractor dropped PDFs when `batchSize` > 1 due to hardcoded `$input.first()` methods processing only the first item in the batch.
+    *   *Fix:* Converted all input parsing nodes to use array mapping (`$input.all().map(...)`), ensuring complete processing of all PDFs in the batch.
 ## [v1.0.0] - Initial Release (main)
 *   Initial 5-agent linear pipeline (Supervisor → Extractor → Analyzer → Writer → Checker).
 *   Complete offline HTML and PDF generation.

@@ -1,21 +1,15 @@
 {
-  "updatedAt": "2026-03-14T20:41:53.141Z",
-  "createdAt": "2026-03-12T14:47:29.493Z",
-  "id": "auJKkkqtL50nbhB1",
   "name": "02 - Paper Extractor Agent",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {},
-      "id": "trigger-ext",
+      "id": "65ee11e8-3bca-4e12-a141-77157bd1edc8",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        704
+        -976,
+        304
       ]
     },
     {
@@ -26,10 +20,10 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        224,
-        704
+        -528,
+        304
       ],
-      "id": "read-files",
+      "id": "71befe61-ebb5-400f-9a8e-4ffe1f61b9cd",
       "name": "Read PDFs"
     },
     {
@@ -37,40 +31,40 @@
         "operation": "pdf",
         "options": {}
       },
-      "id": "extract-pdf",
+      "id": "eee6fb3e-a6c0-4f80-81a9-609769fbaf02",
       "name": "Extract Text",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        448,
-        704
+        -304,
+        304
       ]
     },
     {
       "parameters": {
-        "batchSize": 2,
+        "batchSize": 4,
         "options": {}
       },
-      "id": "batch-papers",
+      "id": "1eadd468-24c1-45bd-9adf-93500dcb6f9d",
       "name": "Batch (Rate Limit)",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        672,
-        704
+        -80,
+        304
       ]
     },
     {
       "parameters": {
-        "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n\n// MİMARİ NOT: Gemini-1.5'in devasa context window'una güvenerek \n// substring(0, 30000) veri kaybı mantığı kaldırıldı.\nreturn [{\n  json: { paper_text: rawText, file_name: fileName }\n}];"
+        "jsCode": "const items = $input.all();\nreturn items.map((item, index) => {\n  const rawText = item.json.text || '';\n  const fileName = item.json.fileName || 'unknown.pdf';\n  // Use runIndex to offset the batch, assuming batchSize is dynamic but we just use item offset for unique ID loosely\n  return {\n    json: { \n      paper_text: rawText, \n      file_name: fileName,\n      paper_number: ($runIndex * items.length) + index + 1 \n    }\n  };\n});"
       },
-      "id": "prep-ext",
+      "id": "3711050d-bf77-4308-9103-dcade808b740",
       "name": "Prepare Paper Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        408
+        144,
+        112
       ]
     },
     {
@@ -78,16 +72,16 @@
         "promptType": "define",
         "text": "=Extract structured information from the following academic paper. The paper_id should be \"P{{ $json.paper_number }}\".\n\n--- PAPER TEXT START ---\n{{ $json.paper_text }}\n--- PAPER TEXT END ---\n\nReturn ONLY the JSON object. No markdown, no explanation.",
         "options": {
-          "systemMessage": "You are the Paper Extractor Agent. Your SOLE job is to read the raw text of ONE academic paper and extract structured information from it. You are a data extraction tool \u2014 nothing more.\n\n## YOUR STRICT RULES\n\n1. EXTRACT ONLY. You do not interpret, compare, synthesize, or evaluate.\n2. SOURCE TEXT ONLY. Every piece of information you return MUST come directly from the provided paper text. If information is not present, mark the field as \"UNCLEAR_IN_SOURCE\".\n3. NO EXTERNAL KNOWLEDGE. You must not use any knowledge beyond what is written in the paper. Even if you \"know\" something about the topic, DO NOT include it.\n4. QUOTE OR CLOSELY PARAPHRASE for key findings and methodology.\n5. Your responses must be deterministic and factual.\n\n## OUTPUT FORMAT\nReturn ONLY a valid JSON object with this structure (no markdown fences, no explanation):\n{\n  \"paper_id\": \"P<number>\",\n  \"title\": \"<exact title>\",\n  \"authors\": [\"<author1>\", \"<author2>\"],\n  \"year\": <year>,\n  \"journal_or_conference\": \"<venue or UNCLEAR_IN_SOURCE>\",\n  \"doi\": \"<DOI or UNCLEAR_IN_SOURCE>\",\n  \"research_objective\": \"<1-2 sentences>\",\n  \"methodology\": {\n    \"type\": \"<type>\",\n    \"description\": \"<2-4 sentences>\",\n    \"dataset\": \"<description or UNCLEAR_IN_SOURCE>\",\n    \"sample_size\": \"<size or UNCLEAR_IN_SOURCE>\",\n    \"tools_or_frameworks\": [\"<tools>\"]\n  },\n  \"key_findings\": [\n    {\n      \"finding\": \"<specific finding>\",\n      \"evidence\": \"<metric or statistic>\",\n      \"section_reference\": \"<section>\"\n    }\n  ],\n  \"limitations\": [\"<limitation or UNCLEAR_IN_SOURCE>\"],\n  \"future_work\": [\"<future work or UNCLEAR_IN_SOURCE>\"],\n  \"key_terms\": [\"<terms>\"],\n  \"references_count\": <number>,\n  \"extraction_confidence\": \"HIGH/MEDIUM/LOW\",\n  \"extraction_notes\": \"<issues>\"\n}\n\nNEVER add findings not in the paper. NEVER infer unstated details. NEVER compare to other papers."
+          "systemMessage": "You are the Paper Extractor Agent. Your SOLE job is to read the raw text of ONE academic paper and extract structured information from it. You are a data extraction tool — nothing more.\n\n## YOUR STRICT RULES\n\n1. EXTRACT ONLY. You do not interpret, compare, synthesize, or evaluate.\n2. SOURCE TEXT ONLY. Every piece of information you return MUST come directly from the provided paper text. If information is not present, mark the field as \"UNCLEAR_IN_SOURCE\".\n3. NO EXTERNAL KNOWLEDGE. You must not use any knowledge beyond what is written in the paper. Even if you \"know\" something about the topic, DO NOT include it.\n4. QUOTE OR CLOSELY PARAPHRASE for key findings and methodology.\n5. Your responses must be deterministic and factual.\n\n## OUTPUT FORMAT\nReturn ONLY a valid JSON object with this structure (no markdown fences, no explanation):\n{\n  \"paper_id\": \"P<number>\",\n  \"title\": \"<exact title>\",\n  \"authors\": [\"<author1>\", \"<author2>\"],\n  \"year\": <year>,\n  \"journal_or_conference\": \"<venue or UNCLEAR_IN_SOURCE>\",\n  \"doi\": \"<DOI or UNCLEAR_IN_SOURCE>\",\n  \"research_objective\": \"<1-2 sentences>\",\n  \"methodology\": {\n    \"type\": \"<type>\",\n    \"description\": \"<2-4 sentences>\",\n    \"dataset\": \"<description or UNCLEAR_IN_SOURCE>\",\n    \"sample_size\": \"<size or UNCLEAR_IN_SOURCE>\",\n    \"tools_or_frameworks\": [\"<tools>\"]\n  },\n  \"key_findings\": [\n    {\n      \"finding\": \"<specific finding>\",\n      \"evidence\": \"<metric or statistic>\",\n      \"section_reference\": \"<section>\"\n    }\n  ],\n  \"limitations\": [\"<limitation or UNCLEAR_IN_SOURCE>\"],\n  \"future_work\": [\"<future work or UNCLEAR_IN_SOURCE>\"],\n  \"key_terms\": [\"<terms>\"],\n  \"references_count\": <number>,\n  \"extraction_confidence\": \"HIGH/MEDIUM/LOW\",\n  \"extraction_notes\": \"<issues>\"\n}\n\nNEVER add findings not in the paper. NEVER infer unstated details. NEVER compare to other papers."
         }
       },
-      "id": "d986de71-26a4-422f-be2e-c680eec6dcf6",
+      "id": "d10aadaf-4780-4178-b29c-938785ef197d",
       "name": "Extractor LLM",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        1120,
-        304
+        368,
+        0
       ]
     },
     {
@@ -98,45 +92,45 @@
           "temperature": 0
         }
       },
-      "id": "6c489d46-2198-4598-98ff-1964e6ee8704",
+      "id": "a011e4e4-fb2b-4884-ab9c-3d94c2349e64",
       "name": "Gemini Flash - Extractor",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        1192,
-        528
+        448,
+        224
       ],
       "credentials": {
         "googlePalmApi": {
-          "id": "PUT_YOUR_CREDENTIAL_ID_HERE",
+          "id": "IZebZJCgpMR7l73Z",
           "name": "Google Gemini(PaLM) Api account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Parse and validate the LLM output\nconst rawOutput = $input.first().json.output || $input.first().json.text || '';\n\n// Try to extract JSON from the output\nlet parsed;\ntry {\n  // Remove markdown fences if present\n  let cleaned = rawOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  // Try to find JSON in the text\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsed = JSON.parse(jsonMatch[0]);\n    } catch (e2) {\n      return [{ json: { error: 'Failed to parse LLM output as JSON', raw_output: rawOutput } }];\n    }\n  } else {\n    return [{ json: { error: 'No JSON found in LLM output', raw_output: rawOutput } }];\n  }\n}\n\n// Validate required fields\nconst requiredFields = ['paper_id', 'title', 'authors', 'year', 'research_objective', 'methodology', 'key_findings'];\nconst missingFields = requiredFields.filter(f => !parsed[f]);\n\nif (missingFields.length > 0) {\n  parsed.extraction_notes = (parsed.extraction_notes || '') + ` WARNING: Missing fields: ${missingFields.join(', ')}`;\n  parsed.extraction_confidence = 'LOW';\n}\n\nreturn [{ json: { extracted_paper: parsed } }];"
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const rawOutput = item.json.output || item.json.text || '';\n  let parsed;\n  try {\n    let cleaned = rawOutput.replace(/\\`\\`\\`json\\n?/g, '').replace(/\\`\\`\\`\\n?/g, '').trim();\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      try { parsed = JSON.parse(jsonMatch[0]); } catch (e2) {\n        return { json: { error: 'Failed to parse', raw_output: rawOutput } };\n      }\n    } else {\n      return { json: { error: 'No JSON found', raw_output: rawOutput } };\n    }\n  }\n\n  const requiredFields = ['paper_id', 'title', 'authors'];\n  const missingFields = requiredFields.filter(f => !parsed[f]);\n  if (missingFields.length > 0) {\n    parsed.extraction_notes = (parsed.extraction_notes || '') + ' WARNING: Missing fields';\n    parsed.extraction_confidence = 'LOW';\n  }\n\n  return { json: { extracted_paper: parsed } };\n});"
       },
-      "id": "b22a2590-194d-48a8-8bb9-26aed7f39cbf",
+      "id": "429e239e-1562-46c6-a691-9e80ef40dc5b",
       "name": "Validate & Parse Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1472,
-        408
+        720,
+        112
       ]
     },
     {
       "parameters": {
         "amount": 3
       },
-      "id": "wait-rate-limit",
+      "id": "dbeb82bd-f8c1-4d0b-9205-2dd6f4e6e482",
       "name": "Wait (3s)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1696,
-        628
+        944,
+        112
       ],
       "webhookId": "ext-wait"
     },
@@ -144,26 +138,26 @@
       "parameters": {
         "jsCode": "const items = $input.all();\nconst extracted = [];\nfor (const item of items) {\n  if (item.json.extracted_paper) {\n    extracted.push(item.json.extracted_paper);\n  }\n}\nreturn [{ json: { extracted_papers: extracted } }];"
       },
-      "id": "collect",
+      "id": "550b955e-7333-417d-bf9f-7a02177ba477",
       "name": "Collect Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        928
+        144,
+        400
       ]
     },
     {
       "parameters": {
         "jsCode": "// The input is { extracted_papers: [...] } from the collect node\nconst data = $input.first().json;\nreturn [{\n  json: { \"success\": true },\n  binary: {\n    json_data: {\n      data: Buffer.from(JSON.stringify(data, null, 2)).toString('base64'),\n      mimeType: 'application/json',\n      fileName: 'temp_extracted.json'\n    }\n  }\n}];"
       },
-      "id": "prep-bin-ext",
+      "id": "5527cf7d-2f8a-4f32-8c82-0db5cffb0ee1",
       "name": "Prep Binary DB",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        704
+        432,
+        400
       ]
     },
     {
@@ -172,43 +166,42 @@
         "dataPropertyName": "json_data",
         "options": {}
       },
-      "id": "write-json-ext",
+      "id": "3bbba5bd-d3ce-4115-b625-0401da46f18a",
       "name": "Write Extracted.json",
       "type": "n8n-nodes-base.writeBinaryFile",
       "typeVersion": 1,
       "position": [
-        1184,
-        704
+        720,
+        400
       ]
     },
     {
       "parameters": {
         "jsCode": "return [{ json: { result: 'Successfully extracted papers. Data saved to temp_extracted.json.' } }];"
       },
-      "id": "return-str-ext",
+      "id": "3c537871-df57-43dc-8015-f5d115a8428a",
       "name": "Return String",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1472,
-        704
+        944,
+        400
       ]
     },
     {
-      "parameters": {
-        "amount": 5,
-        "unit": "seconds"
-      },
-      "id": "wait-rate-limit-start-123",
+      "parameters": {},
+      "id": "8ff84280-8805-4216-9ba4-a542b8cb1b35",
       "name": "Wait (Rate Limit Start)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        150,
-        704
-      ]
+        -752,
+        304
+      ],
+      "webhookId": "1530cc79-d41a-4e4b-95bc-e7c59deac245"
     }
   ],
+  "pinData": {},
   "connections": {
     "Execute Workflow Trigger": {
       "main": [
@@ -247,14 +240,14 @@
       "main": [
         [
           {
-            "node": "Prepare Paper Text",
+            "node": "Collect Results",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Prep Binary DB",
+            "node": "Prepare Paper Text",
             "type": "main",
             "index": 0
           }
@@ -348,37 +341,31 @@
           }
         ]
       ]
+    },
+    "Collect Results": {
+      "main": [
+        [
+          {
+            "node": "Prep Binary DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "staticData": null,
-  "meta": null,
-  "pinData": {},
-  "versionId": "d5716f4b-df71-45a6-bfd2-95dabd0b4d4a",
-  "activeVersionId": "35334ff3-d40c-434d-87b3-49e354ab86be",
-  "versionCounter": 16,
-  "triggerCount": 0,
-  "shared": [
-    {
-      "updatedAt": "2026-03-12T14:47:29.499Z",
-      "createdAt": "2026-03-12T14:47:29.499Z",
-      "role": "workflow:owner",
-      "workflowId": "auJKkkqtL50nbhB1",
-      "projectId": "roA3b85alNOe0Ceu",
-      "project": {
-        "updatedAt": "2026-03-12T11:12:12.445Z",
-        "createdAt": "2026-03-12T11:05:51.767Z",
-        "id": "roA3b85alNOe0Ceu",
-        "name": "Serhan Ege Cayirci <serhanege01@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    }
-  ],
+  "versionId": "17b41334-aad9-464a-84aa-d2572ea19f32",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7aec8b029b068956a10542237692cf3bfbb2d308d8dcc3ca3898552060578cc8"
+  },
+  "id": "0EMzAgHX6hd54Qk9",
   "tags": [
     {
       "updatedAt": "2026-03-12T11:17:42.147Z",
@@ -398,350 +385,5 @@
       "id": "mrxF1lzrZrgz1ZT3",
       "name": "sub-workflow"
     }
-  ],
-  "activeVersion": {
-    "updatedAt": "2026-03-14T20:23:13.631Z",
-    "createdAt": "2026-03-14T20:23:13.631Z",
-    "versionId": "35334ff3-d40c-434d-87b3-49e354ab86be",
-    "workflowId": "auJKkkqtL50nbhB1",
-    "nodes": [
-      {
-        "parameters": {},
-        "id": "trigger-ext",
-        "name": "Execute Workflow Trigger",
-        "type": "n8n-nodes-base.executeWorkflowTrigger",
-        "typeVersion": 1,
-        "position": [
-          0,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "fileSelector": "/home/node/.n8n-files/*.pdf"
-        },
-        "type": "n8n-nodes-base.readWriteFile",
-        "typeVersion": 1.1,
-        "position": [
-          200,
-          300
-        ],
-        "id": "read-files",
-        "name": "Read PDFs"
-      },
-      {
-        "parameters": {
-          "operation": "pdf"
-        },
-        "id": "extract-pdf",
-        "name": "Extract Text",
-        "type": "n8n-nodes-base.extractFromFile",
-        "typeVersion": 1,
-        "position": [
-          400,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "batchSize": 2
-        },
-        "id": "batch-papers",
-        "name": "Batch (Rate Limit)",
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          600,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "const rawText = $input.first().json.text || '';\nconst fileName = $input.first().json.fileName || 'unknown.pdf';\n\n// MİMARİ NOT: Gemini-1.5'in devasa context window'una güvenerek \n// substring(0, 30000) veri kaybı mantığı kaldırıldı.\nreturn [{\n  json: { paper_text: rawText, file_name: fileName }\n}];"
-        },
-        "id": "prep-ext",
-        "name": "Prepare Paper Text",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          800,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "Extract structured information from the following academic paper. The paper_id should be \"P{{ $json.paper_number }}\".\n\n--- PAPER TEXT START ---\n{{ $json.paper_text }}\n--- PAPER TEXT END ---\n\nReturn ONLY the JSON object. No markdown, no explanation.",
-          "options": {
-            "systemMessage": "You are the Paper Extractor Agent. Your SOLE job is to read the raw text of ONE academic paper and extract structured information from it. You are a data extraction tool \u2014 nothing more.\n\n## YOUR STRICT RULES\n\n1. EXTRACT ONLY. You do not interpret, compare, synthesize, or evaluate.\n2. SOURCE TEXT ONLY. Every piece of information you return MUST come directly from the provided paper text. If information is not present, mark the field as \"UNCLEAR_IN_SOURCE\".\n3. NO EXTERNAL KNOWLEDGE. You must not use any knowledge beyond what is written in the paper. Even if you \"know\" something about the topic, DO NOT include it.\n4. QUOTE OR CLOSELY PARAPHRASE for key findings and methodology.\n5. Your responses must be deterministic and factual.\n\n## OUTPUT FORMAT\nReturn ONLY a valid JSON object with this structure (no markdown fences, no explanation):\n{\n  \"paper_id\": \"P<number>\",\n  \"title\": \"<exact title>\",\n  \"authors\": [\"<author1>\", \"<author2>\"],\n  \"year\": <year>,\n  \"journal_or_conference\": \"<venue or UNCLEAR_IN_SOURCE>\",\n  \"doi\": \"<DOI or UNCLEAR_IN_SOURCE>\",\n  \"research_objective\": \"<1-2 sentences>\",\n  \"methodology\": {\n    \"type\": \"<type>\",\n    \"description\": \"<2-4 sentences>\",\n    \"dataset\": \"<description or UNCLEAR_IN_SOURCE>\",\n    \"sample_size\": \"<size or UNCLEAR_IN_SOURCE>\",\n    \"tools_or_frameworks\": [\"<tools>\"]\n  },\n  \"key_findings\": [\n    {\n      \"finding\": \"<specific finding>\",\n      \"evidence\": \"<metric or statistic>\",\n      \"section_reference\": \"<section>\"\n    }\n  ],\n  \"limitations\": [\"<limitation or UNCLEAR_IN_SOURCE>\"],\n  \"future_work\": [\"<future work or UNCLEAR_IN_SOURCE>\"],\n  \"key_terms\": [\"<terms>\"],\n  \"references_count\": <number>,\n  \"extraction_confidence\": \"HIGH/MEDIUM/LOW\",\n  \"extraction_notes\": \"<issues>\"\n}\n\nNEVER add findings not in the paper. NEVER infer unstated details. NEVER compare to other papers."
-          }
-        },
-        "id": "d986de71-26a4-422f-be2e-c680eec6dcf6",
-        "name": "Extractor LLM",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3.1,
-        "position": [
-          1000,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "modelName": "models/gemini-3.1-flash-lite-preview",
-          "options": {
-            "maxOutputTokens": 4096,
-            "temperature": 0
-          }
-        },
-        "id": "6c489d46-2198-4598-98ff-1964e6ee8704",
-        "name": "Gemini Flash - Extractor",
-        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-        "typeVersion": 1,
-        "position": [
-          1000,
-          500
-        ],
-        "credentials": {
-          "googlePalmApi": {
-            "id": "IZebZJCgpMR7l73Z",
-            "name": "Google Gemini(PaLM) Api account"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "// Parse and validate the LLM output\nconst rawOutput = $input.first().json.output || $input.first().json.text || '';\n\n// Try to extract JSON from the output\nlet parsed;\ntry {\n  // Remove markdown fences if present\n  let cleaned = rawOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  // Try to find JSON in the text\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsed = JSON.parse(jsonMatch[0]);\n    } catch (e2) {\n      return [{ json: { error: 'Failed to parse LLM output as JSON', raw_output: rawOutput } }];\n    }\n  } else {\n    return [{ json: { error: 'No JSON found in LLM output', raw_output: rawOutput } }];\n  }\n}\n\n// Validate required fields\nconst requiredFields = ['paper_id', 'title', 'authors', 'year', 'research_objective', 'methodology', 'key_findings'];\nconst missingFields = requiredFields.filter(f => !parsed[f]);\n\nif (missingFields.length > 0) {\n  parsed.extraction_notes = (parsed.extraction_notes || '') + ` WARNING: Missing fields: ${missingFields.join(', ')}`;\n  parsed.extraction_confidence = 'LOW';\n}\n\nreturn [{ json: { extracted_paper: parsed } }];"
-        },
-        "id": "b22a2590-194d-48a8-8bb9-26aed7f39cbf",
-        "name": "Validate & Parse Output",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1200,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "amount": 3,
-          "unit": "seconds"
-        },
-        "id": "wait-rate-limit",
-        "name": "Wait (3s)",
-        "type": "n8n-nodes-base.wait",
-        "typeVersion": 1.1,
-        "position": [
-          1400,
-          500
-        ],
-        "webhookId": "ext-wait"
-      },
-      {
-        "parameters": {
-          "jsCode": "const items = $input.all();\nconst extracted = [];\nfor (const item of items) {\n  if (item.json.extracted_paper) {\n    extracted.push(item.json.extracted_paper);\n  }\n}\nreturn [{ json: { extracted_papers: extracted } }];"
-        },
-        "id": "collect",
-        "name": "Collect Results",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          800,
-          500
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "// The input is { extracted_papers: [...] } from the collect node\nconst data = $input.first().json;\nreturn [{\n  json: { \"success\": true },\n  binary: {\n    json_data: {\n      data: Buffer.from(JSON.stringify(data, null, 2)).toString('base64'),\n      mimeType: 'application/json',\n      fileName: 'temp_extracted.json'\n    }\n  }\n}];"
-        },
-        "id": "prep-bin-ext",
-        "name": "Prep Binary DB",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1200,
-          500
-        ]
-      },
-      {
-        "parameters": {
-          "fileName": "/home/node/.n8n-files/temp_extracted.json",
-          "dataPropertyName": "json_data",
-          "options": {}
-        },
-        "id": "write-json-ext",
-        "name": "Write Extracted.json",
-        "type": "n8n-nodes-base.writeBinaryFile",
-        "typeVersion": 1,
-        "position": [
-          1000,
-          500
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "return [{ json: { result: 'Successfully extracted papers. Data saved to temp_extracted.json.' } }];"
-        },
-        "id": "return-str-ext",
-        "name": "Return String",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1400,
-          500
-        ]
-      }
-    ],
-    "connections": {
-      "Execute Workflow Trigger": {
-        "main": [
-          [
-            {
-              "node": "Read PDFs",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Read PDFs": {
-        "main": [
-          [
-            {
-              "node": "Extract Text",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Extract Text": {
-        "main": [
-          [
-            {
-              "node": "Batch (Rate Limit)",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Batch (Rate Limit)": {
-        "main": [
-          [
-            {
-              "node": "Prepare Paper Text",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Prep Binary DB",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Prepare Paper Text": {
-        "main": [
-          [
-            {
-              "node": "Extractor LLM",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Gemini Flash - Extractor": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "Extractor LLM",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Extractor LLM": {
-        "main": [
-          [
-            {
-              "node": "Validate & Parse Output",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Validate & Parse Output": {
-        "main": [
-          [
-            {
-              "node": "Wait (3s)",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Wait (3s)": {
-        "main": [
-          [
-            {
-              "node": "Batch (Rate Limit)",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Prep Binary DB": {
-        "main": [
-          [
-            {
-              "node": "Write Extracted.json",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Write Extracted.json": {
-        "main": [
-          [
-            {
-              "node": "Return String",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "authors": "Serhan Ege Cayirci",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-03-14T20:23:13.672Z",
-        "id": 45,
-        "workflowId": "auJKkkqtL50nbhB1",
-        "versionId": "35334ff3-d40c-434d-87b3-49e354ab86be",
-        "event": "activated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      },
-      {
-        "createdAt": "2026-03-14T20:23:13.665Z",
-        "id": 44,
-        "workflowId": "auJKkkqtL50nbhB1",
-        "versionId": "35334ff3-d40c-434d-87b3-49e354ab86be",
-        "event": "deactivated",
-        "userId": "72e2a621-6922-459d-bce7-a52562c3a4ae"
-      }
-    ]
-  }
+  ]
 }
